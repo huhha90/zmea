@@ -1,0 +1,10 @@
+{
+  "sound": true,
+  "music": true,
+  "nickname": "Player",
+  "language": "uk",
+  "fullscreen": true,
+  "snake_skin": "default",
+  "show_hints": true,
+  "volume": 0.8
+}

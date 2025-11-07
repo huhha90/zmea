@@ -1,0 +1,1114 @@
+import pygame
+import random
+import sys
+import os
+import json
+import traceback
+import datetime
+import webbrowser
+from pygame.locals import *
+
+# --- Константи ---
+SETTINGS_FILE = "settings.json"
+LEADERBOARD_FILE = "leaderboard.json"
+LEVELS_FILE = "levels.json"
+LEVEL_PROGRESS_FILE = "level_progress.json"
+ERROR_LOG_FILE = "error_log.txt"
+
+# Кольори інтерфейсу
+BG_COLOR = (10, 10, 10)
+BUTTON_COLOR = (50, 50, 50)
+HOVER_COLOR = (100, 100, 100)
+TEXT_COLOR = (0, 255, 0)       # Зелений текст
+ERROR_TEXT_COLOR = (255, 0, 0)   # Червоний для помилок
+WARN_TEXT_COLOR = (255, 165, 0)  # Помаранчевий для попереджень
+INFO_TEXT_COLOR = (200, 200, 200) # Сірий для інформації
+UNLOCKED_LEVEL_COLOR = (0, 180, 0) # Зелений для доступних рівнів
+LOCKED_LEVEL_COLOR = (100, 100, 100) # Сірий для заблокованих рівнів
+PROGRESS_BAR_BG = (100, 100, 100)
+PROGRESS_BAR_FG = (0, 200, 0)
+PAUSE_OVERLAY_COLOR = (0, 0, 0, 150) # Напівпрозорий чорний
+
+# Ігрові кольори та параметри
+DEFAULT_SNAKE_COLOR = [0, 200, 0] # Типовий зелений (список, щоб бути JSON-сумісним)
+FOOD_COLOR = (255, 0, 0)
+SPECIAL_FOOD_COLOR = (0, 0, 255)
+CELL_SIZE = 20
+DEFAULT_GAME_FPS = 15
+
+# Передвстановлені кольори для скінів змійки (RGB у вигляді списків)
+PREDEFINED_SKINS = {
+    "Зелений": [0, 200, 0],
+    "Синій": [0, 0, 255],
+    "Червоний": [200, 0, 0],
+    "Жовтий": [255, 255, 0],
+    "Білий": [255, 255, 255],
+    "Фіолетовий": [128, 0, 128],
+    "Рожевий": [255, 105, 180],
+}
+# Доступні роздільні здатності
+AVAILABLE_RESOLUTIONS = ["800x600", "1024x768", "1280x720", "1366x768", "1600x900", "1920x1080"]
+
+# Типові налаштування
+DEFAULT_SETTINGS = {
+    "profile": {
+        "nickname": "Гравець",
+        "language": "uk"
+    },
+    "graphics": {
+        "resolution": "1024x768",
+        "fullscreen": False,
+        "fps": 60 # FPS для меню
+    },
+    "audio": {
+        "music_volume": 0.5, # 0.0 to 1.0
+        "sound_volume": 0.7, # 0.0 to 1.0 (Нове налаштування)
+        "sound_enabled": True
+    },
+    "controls": {
+        "up": "K_UP", "down": "K_DOWN", "left": "K_LEFT", "right": "K_RIGHT", "pause": "K_ESCAPE"
+    },
+    "gameplay": {
+        "default_speed": DEFAULT_GAME_FPS
+    },
+    "appearance": {
+        "skin_color": DEFAULT_SNAKE_COLOR # Зберігаємо колір як список RGB
+    }
+}
+
+# Словник для мов (з новими ключами для налаштувань)
+LANGUAGES = {
+    "uk": {"play": "Грати", "levels": "Рівні", "train": "Тренування", "leaderboard": "Таблиця лідерів", "settings": "Налаштування", "exit": "Вихід", "save": "Зберегти", "change_nickname": "Змінити нік", "back": "Назад", "sound_on": "Звук: Увімк.", "sound_off": "Звук: Вимк.", "music_on": "Музика: Увімк.", "music_off": "Музика: Вимк.", "language": "Мова", "retry": "Повторити", "game_over": "ГРА ЗАВЕРШЕНА", "loading": "Завантаження...", "optimizing": "Оптимізація гри", "error_title": "ПОМИЛКА ЗАПУСКУ", "error_restart": "Будь ласка, перезапустіть гру.", "error_support": "Якщо помилка повторюється — зверніться в підтримку.", "error_site": "Сайт:", "level_select": "Вибір рівня", "score": "Рахунок", "level": "Рівень", "next_level_unlocked": "Новий рівень відкрито!", "next_level_button": "➡ Наступний рівень", "to_next_level": "До наступного рівня", "points_abbr": "оч.", "pause_title": "Пауза", "continue": "Продовжити", "menu": "Меню", "training_suffix": "(тренування)",
+           "settings_audio": "Музика/Звук", "settings_graphics": "Графіка", "settings_skins": "Скіни", "settings_language": "Мова", "volume_music": "Гучність музики", "volume_sound": "Гучність звуків", "resolution": "Роздільна здатність", "fullscreen": "Повноекранний", "fullscreen_on": "Повноекранний: Так", "fullscreen_off": "Повноекранний: Ні", "apply": "Застосувати", "skin_select": "Вибір скіна"},
+    "en": {"play": "Play", "levels": "Levels", "train": "Training", "leaderboard": "Leaderboard", "settings": "Settings", "exit": "Exit", "save": "Save", "change_nickname": "Change Nickname", "back": "Back", "sound_on": "Sound: On", "sound_off": "Sound: Off", "music_on": "Music: On", "music_off": "Music: Off", "language": "Language", "retry": "Retry", "game_over": "GAME OVER", "loading": "Loading...", "optimizing": "Optimizing game", "error_title": "STARTUP ERROR", "error_restart": "Please restart the game.", "error_support": "If the error persists, contact support.", "error_site": "Website:", "level_select": "Level Select", "score": "Score", "level": "Level", "next_level_unlocked": "New level unlocked!", "next_level_button": "➡ Next Level", "to_next_level": "To next level", "points_abbr": "pts.", "pause_title": "Pause", "continue": "Continue", "menu": "Menu", "training_suffix": "(training)",
+           "settings_audio": "Music/Sound", "settings_graphics": "Graphics", "settings_skins": "Skins", "settings_language": "Language", "volume_music": "Music Volume", "volume_sound": "Sound Volume", "resolution": "Resolution", "fullscreen": "Fullscreen", "fullscreen_on": "Fullscreen: Yes", "fullscreen_off": "Fullscreen: No", "apply": "Apply", "skin_select": "Skin Select"},
+    "pl": {"play": "Graj", "levels": "Poziomy", "train": "Trening", "leaderboard": "Tabela wyników", "settings": "Ustawienia", "exit": "Wyjście", "save": "Zapisz", "change_nickname": "Zmień pseudonim", "back": "Wstecz", "sound_on": "Dźwięk: Wł.", "sound_off": "Dźwięk: Wył.", "music_on": "Muzyka: Wł.", "music_off": "Muzyka: Wył.", "language": "Język", "retry": "Spróbuj ponownie", "game_over": "KONIEC GRY", "loading": "Ładowanie...", "optimizing": "Optymalizacja gry", "error_title": "BŁĄD URUCHAMIANIA", "error_restart": "Proszę zrestartować grę.", "error_support": "Jeśli błąd się powtarza, skontaktuj się z pomocą techniczną.", "error_site": "Strona:", "level_select": "Wybór poziomu", "score": "Wynik", "level": "Poziom", "next_level_unlocked": "Nowy poziom odblokowany!", "next_level_button": "➡ Następny poziom", "to_next_level": "Do następnego poziomu", "points_abbr": "pkt.", "pause_title": "Pauza", "continue": "Kontynuuj", "menu": "Menu", "training_suffix": "(trening)",
+            "settings_audio": "Muzyka/Dźwięk", "settings_graphics": "Grafika", "settings_skins": "Skórki", "settings_language": "Język", "volume_music": "Głośność muzyki", "volume_sound": "Głośność dźwięków", "resolution": "Rozdzielczość", "fullscreen": "Pełny ekran", "fullscreen_on": "Pełny ekran: Tak", "fullscreen_off": "Pełny ekran: Nie", "apply": "Zastosuj", "skin_select": "Wybór skórki"},
+    "de": {"play": "Spielen", "levels": "Level", "train": "Training", "leaderboard": "Bestenliste", "settings": "Einstellungen", "exit": "Beenden", "save": "Speichern", "change_nickname": "Nickname ändern", "back": "Zurück", "sound_on": "Ton: Ein", "sound_off": "Ton: Aus", "music_on": "Musik: Ein", "music_off": "Musik: Aus", "language": "Sprache", "retry": "Erneut versuchen", "game_over": "SPIEL VORBEI", "loading": "Laden...", "optimizing": "Optimiere Spiel", "error_title": "STARTFEHLER", "error_restart": "Bitte starten Sie das Spiel neu.", "error_support": "Wenn der Fehler weiterhin besteht, kontaktieren Sie den Support.", "error_site": "Webseite:", "level_select": "Levelauswahl", "score": "Punkte", "level": "Level", "next_level_unlocked": "Neues Level freigeschaltet!", "next_level_button": "➡ Nächstes Level", "to_next_level": "Bis zum nächsten Level", "points_abbr": "Pkt.", "pause_title": "Pause", "continue": "Fortsetzen", "menu": "Menü", "training_suffix": "(Training)",
+            "settings_audio": "Musik/Ton", "settings_graphics": "Grafik", "settings_skins": "Skins", "settings_language": "Sprache", "volume_music": "Musiklautstärke", "volume_sound": "Tonlautstärke", "resolution": "Auflösung", "fullscreen": "Vollbild", "fullscreen_on": "Vollbild: Ja", "fullscreen_off": "Vollbild: Nein", "apply": "Anwenden", "skin_select": "Skin auswählen"},
+    "ru": {"play": "Играть", "levels": "Уровни", "train": "Тренировка", "leaderboard": "Таблица лидеров", "settings": "Настройки", "exit": "Выход", "save": "Сохранить", "change_nickname": "Сменить ник", "back": "Назад", "sound_on": "Звук: Вкл.", "sound_off": "Звук: Выкл.", "music_on": "Музыка: Вкл.", "music_off": "Музыка: Выкл.", "language": "Язык", "retry": "Повторить", "game_over": "ИГРА ОКОНЧЕНА", "loading": "Загрузка...", "optimizing": "Оптимизация игры", "error_title": "ОШИБКА ЗАПУСКА", "error_restart": "Пожалуйста, перезапустите игру.", "error_support": "Если ошибка повторится, обратитесь в поддержку.", "error_site": "Сайт:", "level_select": "Выбор уровня", "score": "Счет", "level": "Уровень", "next_level_unlocked": "Новый уровень открыт!", "next_level_button": "➡ Следующий уровень", "to_next_level": "До следующего уровня", "points_abbr": "очк.", "pause_title": "Пауза", "continue": "Продолжить", "menu": "Меню", "training_suffix": "(тренировка)",
+            "settings_audio": "Музыка/Звук", "settings_graphics": "Графика", "settings_skins": "Скины", "settings_language": "Язык", "volume_music": "Громкость музыки", "volume_sound": "Громкость звуков", "resolution": "Разрешение", "fullscreen": "Полный экран", "fullscreen_on": "Полный экран: Да", "fullscreen_off": "Полный экран: Нет", "apply": "Применить", "skin_select": "Выбор скина"},
+    "tr": {"play": "Oyna", "levels": "Seviyeler", "train": "Antrenman", "leaderboard": "Lider Tablosu", "settings": "Ayarlar", "exit": "Çıkış", "save": "Kaydet", "change_nickname": "Takma Adı Değiştir", "back": "Geri", "sound_on": "Ses: Açık", "sound_off": "Ses: Kapalı", "music_on": "Müzik: Açık", "music_off": "Müzik: Kapalı", "language": "Dil", "retry": "Tekrar Dene", "game_over": "OYUN BİTTİ", "loading": "Yükleniyor...", "optimizing": "Oyun optimize ediliyor", "error_title": "BAŞLATMA HATASI", "error_restart": "Lütfen oyunu yeniden başlatın.", "error_support": "Hata devam ederse destek ile iletişime geçin.", "error_site": "Web sitesi:", "level_select": "Seviye Seçimi", "score": "Skor", "level": "Seviye", "next_level_unlocked": "Yeni seviye açıldı!", "next_level_button": "➡ Sonraki Seviye", "to_next_level": "Sonraki seviyeye", "points_abbr": "puan", "pause_title": "Duraklat", "continue": "Devam Et", "menu": "Menü", "training_suffix": "(antrenman)",
+            "settings_audio": "Müzik/Ses", "settings_graphics": "Grafikler", "settings_skins": "Görünümler", "settings_language": "Dil", "volume_music": "Müzik Ses Düzeyi", "volume_sound": "Ses Efekti Düzeyi", "resolution": "Çözünürlük", "fullscreen": "Tam Ekran", "fullscreen_on": "Tam Ekran: Evet", "fullscreen_off": "Tam Ekran: Hayır", "apply": "Uygula", "skin_select": "Görünüm Seç"},
+    "zh": {"play": "开始游戏", "levels": "关卡", "train": "训练", "leaderboard": "排行榜", "settings": "设置", "exit": "退出", "save": "保存", "change_nickname": "更改昵称", "back": "返回", "sound_on": "声音: 开", "sound_off": "声音: 关", "music_on": "音乐: 开", "music_off": "音乐: 关", "language": "语言", "retry": "重试", "game_over": "游戏结束", "loading": "加载中...", "optimizing": "优化游戏", "error_title": "启动错误", "error_restart": "请重新启动游戏。", "error_support": "如果问题仍然存在，请联系支持。", "error_site": "网站:", "level_select": "选择关卡", "score": "分数", "level": "关卡", "next_level_unlocked": "新关卡已解锁！", "next_level_button": "➡ 下一关", "to_next_level": "距离下一关", "points_abbr": "分", "pause_title": "暂停", "continue": "继续", "menu": "菜单", "training_suffix": "(训练)",
+            "settings_audio": "音乐/声音", "settings_graphics": "图像", "settings_skins": "皮肤", "settings_language": "语言", "volume_music": "音乐音量", "volume_sound": "音效音量", "resolution": "分辨率", "fullscreen": "全屏", "fullscreen_on": "全屏: 是", "fullscreen_off": "全屏: 否", "apply": "应用", "skin_select": "选择皮肤"},
+    "ja": {"play": "プレイ", "levels": "レベル", "train": "トレーニング", "leaderboard": "ランキング", "settings": "設定", "exit": "終了", "save": "保存", "change_nickname": "名前変更", "back": "戻る", "sound_on": "サウンド: オン", "sound_off": "サウンド: オフ", "music_on": "音楽: オン", "music_off": "音楽: オフ", "language": "言語", "retry": "リトライ", "game_over": "ゲームオーバー", "loading": "ロード中...", "optimizing": "ゲームを最適化中", "error_title": "起動エラー", "error_restart": "ゲームを再起動してください。", "error_support": "問題が解決しない場合は、サポートにお問い合わせください。", "error_site": "ウェブサイト:", "level_select": "レベル選択", "score": "スコア", "level": "レベル", "next_level_unlocked": "新しいレベルがアンロックされました！", "next_level_button": "➡ 次のレベル", "to_next_level": "次のレベルまで", "points_abbr": "点", "pause_title": "一時停止", "continue": "続ける", "menu": "メニュー", "training_suffix": "(トレーニング)",
+            "settings_audio": "音楽/サウンド", "settings_graphics": "グラフィック", "settings_skins": "スキン", "settings_language": "言語", "volume_music": "音楽の音量", "volume_sound": "効果音の音量", "resolution": "解像度", "fullscreen": "フルスクリーン", "fullscreen_on": "フルスクリーン: はい", "fullscreen_off": "フルスクリーン: いいえ", "apply": "適用", "skin_select": "スキン選択"}
+}
+
+
+# --- Допоміжні функції --- (Залишаються без змін)
+
+def log_exception():
+    try:
+        with open(ERROR_LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(f"\n=== [{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] ===\n")
+            traceback.print_exc(file=f)
+        print(f"Помилку записано у файл {ERROR_LOG_FILE}")
+    except Exception as log_err:
+        print(f"Критична помилка: Не вдалося записати лог помилок! {log_err}")
+
+def resource_path(relative_path):
+    try: base_path = sys._MEIPASS
+    except Exception: base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
+def load_json_file(filepath, default_data):
+    try:
+        with open(filepath, "r", encoding="utf-8") as file: return json.load(file)
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"Попередження: Не вдалося завантажити {filepath} ({e}). Використовуються типові дані.")
+        if isinstance(default_data, (dict, list)): return default_data.copy()
+        return default_data
+    except Exception as e:
+        print(f"Помилка завантаження {filepath}: {e}"); log_exception()
+        if isinstance(default_data, (dict, list)): return default_data.copy()
+        return default_data
+
+def save_json_file(filepath, data):
+    try:
+        with open(filepath, "w", encoding="utf-8") as file: json.dump(data, file, indent=4, ensure_ascii=False)
+        return True
+    except Exception as e:
+        print(f"Помилка збереження {filepath}: {e}"); log_exception(); return False
+
+# --- Клас гри ---
+class SnakeGame:
+    def __init__(self):
+        """Ініціалізація гри, Pygame, налаштувань, ресурсів."""
+        try:
+            self.settings = load_json_file(SETTINGS_FILE, DEFAULT_SETTINGS)
+            self._ensure_settings_structure()
+
+            pygame.init()
+            pygame.mixer.init()
+
+            self._apply_graphics_settings() # Виносимо застосування графіки в окремий метод
+
+            self.font = pygame.font.Font(None, 36)
+            self.small_font = pygame.font.Font(None, 28) # Менший шрифт для UI
+            self.clock = pygame.time.Clock()
+            self.running = True; self.game_running = False; self.paused = False
+            self.current_level = None; self.training_mode = False
+            self.next_level_available = False; self.next_button_rect = None
+            self.new_level_unlocked_message = ""; self.new_level_timer = 0
+            self.foods = []; self.snake = []
+            self._start_next_level_on_exit = False
+            self.active_settings_submenu = None # Для відстеження активного підменю налаштувань
+
+            self.loading_screen()
+
+            self.sounds = self._load_sounds()
+            self.levels = load_json_file(LEVELS_FILE, [])
+            self.level_progress = load_json_file(LEVEL_PROGRESS_FILE, {"unlocked_levels": [0]})
+            self.leaderboard = load_json_file(LEADERBOARD_FILE, [])
+
+            self.play_music("menu")
+
+        except Exception as e:
+            print(f"Критична помилка під час ініціалізації гри: {e}")
+            log_exception(); self.show_critical_error_screen(str(e)); self.running = False
+
+    def _apply_graphics_settings(self, previous_flags=0):
+         """Застосовує роздільну здатність та повноекранний режим."""
+         try:
+              resolution = self.settings["graphics"]["resolution"]
+              # Перевірка, чи роздільна здатність є в списку доступних
+              if resolution not in AVAILABLE_RESOLUTIONS:
+                   print(f"Попередження: Роздільна здатність {resolution} не підтримується. Встановлено типову.")
+                   resolution = DEFAULT_SETTINGS["graphics"]["resolution"]
+                   self.settings["graphics"]["resolution"] = resolution # Оновлюємо в налаштуваннях
+
+              self.width, self.height = map(int, resolution.split("x"))
+              flags = 0
+              if self.settings["graphics"]["fullscreen"]:
+                   flags = pygame.FULLSCREEN | pygame.SCALED # SCALED для кращого масштабування
+              # Перевіряємо, чи змінились налаштування екрану
+              if flags != previous_flags or pygame.display.get_window_size() != (self.width, self.height):
+                   print(f"Застосування графічних налаштувань: {self.width}x{self.height}, Fullscreen: {self.settings['graphics']['fullscreen']}")
+                   self.screen = pygame.display.set_mode((self.width, self.height), flags)
+              pygame.display.set_caption("ЗМІЙКА") # Оновлюємо заголовок на випадок зміни режиму
+              return flags # Повертаємо нові прапори для порівняння
+         except Exception as e:
+              print(f"Помилка застосування графічних налаштувань: {e}")
+              log_exception()
+              # Спробувати встановити безпечний режим
+              self.width, self.height = 800, 600
+              self.screen = pygame.display.set_mode((self.width, self.height))
+              return 0
+
+    def _ensure_settings_structure(self):
+        """Переконується, що словник self.settings має всі ключі з DEFAULT_SETTINGS."""
+        changed = False; temp_settings = self.settings.copy()
+        for key, default_value in DEFAULT_SETTINGS.items():
+            if key not in temp_settings: temp_settings[key] = default_value; changed = True
+            elif isinstance(default_value, dict):
+                 if key not in temp_settings or not isinstance(temp_settings[key], dict): temp_settings[key] = default_value.copy(); changed = True
+                 else:
+                      for sub_key, sub_default_value in default_value.items():
+                           if sub_key not in temp_settings[key]: temp_settings[key][sub_key] = sub_default_value; changed = True
+        if changed: self.settings = temp_settings; print("Структуру налаштувань оновлено."); save_json_file(SETTINGS_FILE, self.settings)
+
+    def _load_sounds(self):
+        """Завантажує звукові ефекти."""
+        sounds = {}; sound_files = {"eat": "assets/music/eat.wav", "collision": "assets/music/collision.wav", "click": "assets/music/click.wav"}
+        if self.settings["audio"]["sound_enabled"]:
+            for name, path in sound_files.items():
+                try: sounds[name] = pygame.mixer.Sound(resource_path(path))
+                except Exception as e: print(f"Попередження: Не вдалося завантажити звук '{name}' з {path}: {e}")
+        return sounds
+
+    def play_sound(self, name):
+        """Відтворює звуковий ефект з поточною гучністю."""
+        if self.settings["audio"]["sound_enabled"] and name in self.sounds:
+            try:
+                # Встановлюємо гучність для цього звуку перед відтворенням
+                self.sounds[name].set_volume(self.settings["audio"]["sound_volume"])
+                self.sounds[name].play()
+            except Exception as e: print(f"Помилка відтворення звуку '{name}': {e}")
+
+    def play_music(self, music_type, level_data=None):
+        """Відтворює фонову музику залежно від типу."""
+        volume = self.settings["audio"]["music_volume"]; pygame.mixer.music.set_volume(volume)
+        if volume == 0: pygame.mixer.music.stop(); return
+        path = None
+        if music_type == "menu": path = resource_path("assets/music/menu_music.mp3")
+        elif music_type == "game": path = resource_path("assets/music/Snake_Rattle_Dendy.mp3")
+        elif music_type == "training": path = resource_path("assets/music/training-mode.mp3")
+        elif music_type == "level" and level_data: level_music_file = level_data.get("music", "level1.mp3"); path = resource_path(f"assets/levls/{level_music_file}")
+        if path and os.path.exists(path):
+            try: pygame.mixer.music.stop(); pygame.mixer.music.load(path); pygame.mixer.music.play(-1)
+            except Exception as e: print(f"Помилка музики {path}: {e}")
+        elif path: print(f"Попередження: Файл музики не знайдено: {path}")
+
+    def get_text(self, key):
+        """Отримує перекладений текст за ключем."""
+        lang_code = self.settings["profile"]["language"]
+        return LANGUAGES.get(lang_code, LANGUAGES["en"]).get(key, f"<{key}_missing>")
+
+    def loading_screen(self): # Залишається без змін, але використовує FPS з налаштувань
+        loading_active = True; percent = 0; start_time = pygame.time.get_ticks(); duration = 1500 # Швидше завантаження
+        error = None; link_rect = None; support_site = "afercorporftaon.onepage.me"
+        try: self._check_critical_files(); print("Перевірка крит. файлів успішна.")
+        except Exception as e: error = str(e); log_exception()
+        while loading_active:
+            elapsed = pygame.time.get_ticks() - start_time; percent = min(100, int((elapsed / duration) * 100))
+            self.screen.fill(BG_COLOR)
+            if error:
+                title = self.font.render(self.get_text("error_title"), True, ERROR_TEXT_COLOR); self.screen.blit(title, (self.width // 2 - title.get_width() // 2, self.height // 2 - 120))
+                lines = [self.get_text("error_restart"), self.get_text("error_support"), f"{self.get_text('error_site')} {support_site}"]
+                for i, line in enumerate(lines): text = self.font.render(line, True, INFO_TEXT_COLOR); text_rect = text.get_rect(center=(self.width // 2, self.height // 2 - 40 + i * 50)); self.screen.blit(text, text_rect);
+                if self.get_text('error_site') in line: link_rect = text_rect; pygame.draw.line(self.screen, INFO_TEXT_COLOR, text_rect.bottomleft, text_rect.bottomright, 1)
+            else:
+                text = self.font.render(f"{self.get_text('loading')} {self.get_text('optimizing')}", True, TEXT_COLOR); self.screen.blit(text, (self.width // 2 - text.get_width() // 2, self.height // 2 - 80))
+                bar_width = self.width * 0.6; bar_height = 40; bar_x = self.width // 2 - bar_width // 2; bar_y = self.height // 2
+                pygame.draw.rect(self.screen, PROGRESS_BAR_BG, (bar_x, bar_y, bar_width, bar_height), border_radius=10); current_width = bar_width * (percent / 100); pygame.draw.rect(self.screen, PROGRESS_BAR_FG, (bar_x, bar_y, current_width, bar_height), border_radius=10)
+                percent_text = self.font.render(f"{percent}%", True, TEXT_COLOR); self.screen.blit(percent_text, (self.width // 2 - percent_text.get_width() // 2, bar_y + bar_height + 10))
+            pygame.display.flip()
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT: self.exit_game()
+                elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE: self.exit_game()
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    if error and link_rect and link_rect.collidepoint(event.pos):
+                        try: webbrowser.open(f"https://{support_site}")
+                        except Exception as wb_err: print(f"Не вдалося відкрити посилання: {wb_err}")
+            if percent >= 100 and not error: loading_active = False
+            self.clock.tick(self.settings["graphics"]["fps"]) # Використовуємо FPS з налаштувань
+        print("Завантаження завершено.")
+
+    def _check_critical_files(self): # Залишається без змін
+        print("Перевірка крит. файлів..."); required = ["assets/music/eat.wav", "assets/music/collision.wav", "assets/music/click.wav", "assets/music/menu_music.mp3", "assets/emoji/lock.png", "assets/emoji/skull.png", "assets/emoji/snake.png", "assets/emoji/trophy.png"]
+        missing = [p for p in required if not os.path.exists(resource_path(p))]
+        if missing: print(f"ПОПЕРЕДЖЕННЯ: Відсутні файли: {', '.join(missing)}.")
+        else: print("Крит. файли на місці.")
+
+    def draw_emoji(self, name, x, y, size=64): # Залишається без змін
+        try: path = resource_path(f"assets/emoji/{name}.png"); img = pygame.image.load(path).convert_alpha(); img = pygame.transform.scale(img, (size, size)); self.screen.blit(img, (x, y))
+        except Exception as e: print(f"Попередження: Емодзі '{name}' ({e}). Шлях: {path}"); pygame.draw.rect(self.screen, WARN_TEXT_COLOR, (x, y, size, size), 2)
+
+    # --- Меню та UI ---
+
+    def _create_button_rects(self, button_keys, start_y_offset=0, button_width=300, button_height=60, spacing=20):
+        """Допоміжна функція для створення прямокутників кнопок."""
+        rects = []
+        total_height = len(button_keys) * button_height + (len(button_keys) - 1) * spacing
+        start_y = (self.height - total_height) // 2 + start_y_offset
+        for i, key in enumerate(button_keys):
+            rect = pygame.Rect(self.width // 2 - button_width // 2, start_y + i * (button_height + spacing), button_width, button_height)
+            rects.append((rect, key)) # Зберігаємо прямокутник і ключ дії/тексту
+        return rects
+
+    def _draw_buttons(self, button_rect_data, mouse_pos):
+         """Малює кнопки зі списку (rect, text_key)."""
+         for rect, text_key in button_rect_data:
+              color = HOVER_COLOR if rect.collidepoint(mouse_pos) else BUTTON_COLOR
+              pygame.draw.rect(self.screen, color, rect, border_radius=10)
+              label = self.font.render(self.get_text(text_key), True, TEXT_COLOR)
+              label_rect = label.get_rect(center=rect.center)
+              self.screen.blit(label, label_rect)
+
+    def show_menu(self):
+        """Показує головне меню гри."""
+        menu_active = True
+        self.play_music("menu")
+        button_keys = ["play", "levels", "train", "leaderboard", "change_nickname", "settings", "exit"]
+        actions = { # Використовуємо словник для дій
+            "play": lambda: self.run_game(start_level=None), # "Грати" запускає гру без рівня
+            "levels": self.level_select_menu,
+            "train": lambda: self.run_game(training=True),
+            "leaderboard": self.show_leaderboard,
+            "change_nickname": self.change_nickname_menu,
+            "settings": self.show_settings_menu, # Перехід до головного меню налаштувань
+            "exit": self.exit_game
+        }
+        button_rect_data = self._create_button_rects(button_keys, start_y_offset=-50) # Трохи підняли кнопки
+
+        while menu_active:
+            self.screen.fill(BG_COLOR)
+            title_text = self.font.render("ЗМІЙКА", True, TEXT_COLOR); title_rect = title_text.get_rect(center=(self.width // 2, button_rect_data[0][0].top - 80)); self.screen.blit(title_text, title_rect)
+            self.draw_emoji("snake", title_rect.left - 70, title_rect.top - 10)
+            mouse_pos = pygame.mouse.get_pos()
+            self._draw_buttons(button_rect_data, mouse_pos) # Використовуємо нову функцію малювання
+            pygame.display.flip()
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT: self.exit_game()
+                elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE: self.exit_game()
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    for rect, key in button_rect_data:
+                        if rect.collidepoint(mouse_pos):
+                            self.play_sound("click"); menu_active = False; actions[key](); return
+            self.clock.tick(self.settings["graphics"]["fps"])
+
+    # --- Нове Багаторівневе Меню Налаштувань ---
+
+    def show_settings_menu(self):
+        """Головне меню налаштувань з категоріями."""
+        menu_active = True
+        self.active_settings_submenu = None # Скидаємо активне підменю
+
+        button_keys = ["settings_audio", "settings_graphics", "settings_skins", "settings_language", "back"]
+        actions = {
+            "settings_audio": self.show_audio_settings,
+            "settings_graphics": self.show_graphics_settings,
+            "settings_skins": self.show_skin_settings,
+            "settings_language": self.show_language_settings,
+            "back": self.show_menu # Кнопка "Назад" повертає в головне ігрове меню
+        }
+        button_rect_data = self._create_button_rects(button_keys)
+
+        while menu_active:
+             # Якщо активне підменю, викликаємо його і виходимо з цього циклу
+             if self.active_settings_submenu:
+                  submenu_func = self.active_settings_submenu
+                  self.active_settings_submenu = None # Скидаємо перед викликом
+                  submenu_func() # Викликаємо функцію підменю
+                  # Якщо підменю повернуло нас сюди (через кнопку "Назад" в ньому),
+                  # то просто продовжуємо цикл головного меню налаштувань.
+                  # Якщо підменю вийшло в головне меню гри, то цей цикл завершиться.
+                  if not self.running: menu_active = False # Вихід з гри з підменю
+                  continue # Продовжуємо цикл show_settings_menu
+
+             self.screen.fill(BG_COLOR)
+             title = self.font.render(self.get_text("settings"), True, TEXT_COLOR)
+             title_rect = title.get_rect(center=(self.width // 2, button_rect_data[0][0].top - 60))
+             self.screen.blit(title, title_rect)
+
+             mouse_pos = pygame.mouse.get_pos()
+             self._draw_buttons(button_rect_data, mouse_pos)
+             pygame.display.flip()
+
+             for event in pygame.event.get():
+                  if event.type == pygame.QUIT: self.exit_game()
+                  elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                       save_json_file(SETTINGS_FILE, self.settings); menu_active = False; self.show_menu(); return
+                  elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                       for rect, key in button_rect_data:
+                            if rect.collidepoint(mouse_pos):
+                                 self.play_sound("click")
+                                 if key == "back":
+                                      save_json_file(SETTINGS_FILE, self.settings)
+                                      menu_active = False
+                                      actions[key]() # Виклик show_menu()
+                                 else:
+                                      self.active_settings_submenu = actions[key] # Встановлюємо активне підменю
+                                 break # Виходимо з циклу кнопок
+                       if self.active_settings_submenu: break # Виходимо з циклу подій, щоб перейти до підменю
+
+             self.clock.tick(self.settings["graphics"]["fps"])
+
+
+    def show_audio_settings(self):
+        """Підменю налаштувань Музики та Звуку."""
+        submenu_active = True
+        volume_step = 0.1 # Крок зміни гучності
+
+        # Розміщення елементів
+        option_width = self.width * 0.7
+        option_height = 50
+        spacing = 15
+        button_width = 40 # Ширина кнопок +/-
+
+        # Позиції для елементів
+        music_vol_y = 150
+        sound_vol_y = music_vol_y + option_height + spacing
+        sound_toggle_y = sound_vol_y + option_height + spacing
+        back_button_y = self.height - 80
+
+        while submenu_active:
+            self.screen.fill(BG_COLOR)
+            title = self.font.render(self.get_text("settings_audio"), True, TEXT_COLOR)
+            title_rect = title.get_rect(center=(self.width // 2, 80))
+            self.screen.blit(title, title_rect)
+
+            mouse_pos = pygame.mouse.get_pos()
+
+            # --- Гучність Музики ---
+            music_label = self.font.render(f"{self.get_text('volume_music')}: {int(self.settings['audio']['music_volume']*100)}%", True, TEXT_COLOR)
+            music_label_rect = music_label.get_rect(center=(self.width // 2, music_vol_y + option_height // 2))
+            self.screen.blit(music_label, music_label_rect)
+            # Кнопки +/-
+            music_minus_rect = pygame.Rect(music_label_rect.left - button_width - spacing, music_vol_y, button_width, option_height)
+            music_plus_rect = pygame.Rect(music_label_rect.right + spacing, music_vol_y, button_width, option_height)
+            pygame.draw.rect(self.screen, HOVER_COLOR if music_minus_rect.collidepoint(mouse_pos) else BUTTON_COLOR, music_minus_rect, border_radius=5)
+            pygame.draw.rect(self.screen, HOVER_COLOR if music_plus_rect.collidepoint(mouse_pos) else BUTTON_COLOR, music_plus_rect, border_radius=5)
+            minus_text = self.font.render("-", True, TEXT_COLOR); plus_text = self.font.render("+", True, TEXT_COLOR)
+            self.screen.blit(minus_text, minus_text.get_rect(center=music_minus_rect.center))
+            self.screen.blit(plus_text, plus_text.get_rect(center=music_plus_rect.center))
+
+            # --- Гучність Звуків ---
+            sound_label = self.font.render(f"{self.get_text('volume_sound')}: {int(self.settings['audio']['sound_volume']*100)}%", True, TEXT_COLOR)
+            sound_label_rect = sound_label.get_rect(center=(self.width // 2, sound_vol_y + option_height // 2))
+            self.screen.blit(sound_label, sound_label_rect)
+            # Кнопки +/-
+            sound_minus_rect = pygame.Rect(sound_label_rect.left - button_width - spacing, sound_vol_y, button_width, option_height)
+            sound_plus_rect = pygame.Rect(sound_label_rect.right + spacing, sound_vol_y, button_width, option_height)
+            pygame.draw.rect(self.screen, HOVER_COLOR if sound_minus_rect.collidepoint(mouse_pos) else BUTTON_COLOR, sound_minus_rect, border_radius=5)
+            pygame.draw.rect(self.screen, HOVER_COLOR if sound_plus_rect.collidepoint(mouse_pos) else BUTTON_COLOR, sound_plus_rect, border_radius=5)
+            self.screen.blit(minus_text, minus_text.get_rect(center=sound_minus_rect.center))
+            self.screen.blit(plus_text, plus_text.get_rect(center=sound_plus_rect.center))
+
+            # --- Перемикач Звуків ---
+            sound_toggle_rect = pygame.Rect(self.width // 2 - option_width // 2, sound_toggle_y, option_width, option_height)
+            sound_toggle_color = HOVER_COLOR if sound_toggle_rect.collidepoint(mouse_pos) else BUTTON_COLOR
+            pygame.draw.rect(self.screen, sound_toggle_color, sound_toggle_rect, border_radius=10)
+            sound_toggle_text = self.get_text("sound_on") if self.settings["audio"]["sound_enabled"] else self.get_text("sound_off")
+            sound_toggle_label = self.font.render(sound_toggle_text, True, TEXT_COLOR)
+            self.screen.blit(sound_toggle_label, sound_toggle_label.get_rect(center=sound_toggle_rect.center))
+
+            # --- Кнопка Назад ---
+            back_button_rect = pygame.Rect(self.width // 2 - 100, back_button_y, 200, 50)
+            back_color = HOVER_COLOR if back_button_rect.collidepoint(mouse_pos) else BUTTON_COLOR
+            pygame.draw.rect(self.screen, back_color, back_button_rect, border_radius=10)
+            back_label = self.font.render(self.get_text("back"), True, TEXT_COLOR)
+            self.screen.blit(back_label, back_label.get_rect(center=back_button_rect.center))
+
+            pygame.display.flip()
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT: self.exit_game()
+                elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                     save_json_file(SETTINGS_FILE, self.settings); submenu_active = False; return # Повернення до головного меню налаштувань
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    new_music_volume = self.settings['audio']['music_volume']
+                    new_sound_volume = self.settings['audio']['sound_volume']
+
+                    if music_minus_rect.collidepoint(mouse_pos): new_music_volume = max(0.0, new_music_volume - volume_step)
+                    elif music_plus_rect.collidepoint(mouse_pos): new_music_volume = min(1.0, new_music_volume + volume_step)
+                    elif sound_minus_rect.collidepoint(mouse_pos): new_sound_volume = max(0.0, new_sound_volume - volume_step)
+                    elif sound_plus_rect.collidepoint(mouse_pos): new_sound_volume = min(1.0, new_sound_volume + volume_step)
+                    elif sound_toggle_rect.collidepoint(mouse_pos):
+                         self.settings["audio"]["sound_enabled"] = not self.settings["audio"]["sound_enabled"]
+                         self.sounds = self._load_sounds() # Перезавантажуємо або очищуємо звуки
+                         self.play_sound("click") # Тестовий клік після зміни
+                    elif back_button_rect.collidepoint(mouse_pos):
+                         save_json_file(SETTINGS_FILE, self.settings); submenu_active = False; return # Повернення
+
+                    # Застосовуємо нову гучність музики, якщо змінилась
+                    if new_music_volume != self.settings['audio']['music_volume']:
+                         self.settings['audio']['music_volume'] = round(new_music_volume, 2)
+                         pygame.mixer.music.set_volume(self.settings['audio']['music_volume'])
+                         self.play_sound("click") # Звук кліку для підтвердження
+
+                    # Застосовуємо нову гучність звуків, якщо змінилась
+                    if new_sound_volume != self.settings['audio']['sound_volume']:
+                         self.settings['audio']['sound_volume'] = round(new_sound_volume, 2)
+                         self.play_sound("click") # Звук кліку для підтвердження
+
+            self.clock.tick(self.settings["graphics"]["fps"])
+
+
+    def show_graphics_settings(self):
+        """Підменю налаштувань Графіки."""
+        submenu_active = True
+        current_res_index = AVAILABLE_RESOLUTIONS.index(self.settings["graphics"]["resolution"]) \
+                             if self.settings["graphics"]["resolution"] in AVAILABLE_RESOLUTIONS else 0
+        current_fullscreen = self.settings["graphics"]["fullscreen"]
+        settings_changed = False # Прапорець, чи були зміни
+
+        # Розміщення
+        res_y = 150
+        fs_y = res_y + 70
+        apply_y = self.height - 150
+        back_y = self.height - 80
+        button_width = 40 # Для стрілок
+
+        while submenu_active:
+            self.screen.fill(BG_COLOR)
+            title = self.font.render(self.get_text("settings_graphics"), True, TEXT_COLOR)
+            title_rect = title.get_rect(center=(self.width // 2, 80))
+            self.screen.blit(title, title_rect)
+
+            mouse_pos = pygame.mouse.get_pos()
+
+            # --- Роздільна здатність ---
+            res_label = self.font.render(f"{self.get_text('resolution')}: {AVAILABLE_RESOLUTIONS[current_res_index]}", True, TEXT_COLOR)
+            res_label_rect = res_label.get_rect(center=(self.width // 2, res_y + 25))
+            self.screen.blit(res_label, res_label_rect)
+            # Стрілки < >
+            res_left_rect = pygame.Rect(res_label_rect.left - button_width - 15, res_y, button_width, 50)
+            res_right_rect = pygame.Rect(res_label_rect.right + 15, res_y, button_width, 50)
+            pygame.draw.rect(self.screen, HOVER_COLOR if res_left_rect.collidepoint(mouse_pos) else BUTTON_COLOR, res_left_rect, border_radius=5)
+            pygame.draw.rect(self.screen, HOVER_COLOR if res_right_rect.collidepoint(mouse_pos) else BUTTON_COLOR, res_right_rect, border_radius=5)
+            left_arrow = self.font.render("<", True, TEXT_COLOR); right_arrow = self.font.render(">", True, TEXT_COLOR)
+            self.screen.blit(left_arrow, left_arrow.get_rect(center=res_left_rect.center))
+            self.screen.blit(right_arrow, right_arrow.get_rect(center=res_right_rect.center))
+
+            # --- Повноекранний режим ---
+            fs_rect = pygame.Rect(self.width // 2 - 175, fs_y, 350, 60) # Ширша кнопка
+            fs_color = HOVER_COLOR if fs_rect.collidepoint(mouse_pos) else BUTTON_COLOR
+            pygame.draw.rect(self.screen, fs_color, fs_rect, border_radius=10)
+            fs_text = self.get_text("fullscreen_on") if current_fullscreen else self.get_text("fullscreen_off")
+            fs_label = self.font.render(fs_text, True, TEXT_COLOR)
+            self.screen.blit(fs_label, fs_label.get_rect(center=fs_rect.center))
+
+            # --- Кнопка Застосувати (якщо були зміни) ---
+            apply_button_rect = pygame.Rect(self.width // 2 - 100, apply_y, 200, 50)
+            if settings_changed:
+                 apply_color = HOVER_COLOR if apply_button_rect.collidepoint(mouse_pos) else (0,150,0) # Зелена кнопка
+                 pygame.draw.rect(self.screen, apply_color, apply_button_rect, border_radius=10)
+                 apply_label = self.font.render(self.get_text("apply"), True, TEXT_COLOR)
+                 self.screen.blit(apply_label, apply_label.get_rect(center=apply_button_rect.center))
+
+            # --- Кнопка Назад ---
+            back_button_rect = pygame.Rect(self.width // 2 - 100, back_y, 200, 50)
+            back_color = HOVER_COLOR if back_button_rect.collidepoint(mouse_pos) else BUTTON_COLOR
+            pygame.draw.rect(self.screen, back_color, back_button_rect, border_radius=10)
+            back_label = self.font.render(self.get_text("back"), True, TEXT_COLOR)
+            self.screen.blit(back_label, back_label.get_rect(center=back_button_rect.center))
+
+            pygame.display.flip()
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT: self.exit_game()
+                elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                     # Якщо були зміни, запитати чи зберегти? Або просто вийти без збереження?
+                     # Поки що виходимо без збереження змін у цьому підменю
+                     submenu_active = False; return
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    clicked = False
+                    if res_left_rect.collidepoint(mouse_pos):
+                         current_res_index = (current_res_index - 1) % len(AVAILABLE_RESOLUTIONS)
+                         settings_changed = True; clicked = True
+                    elif res_right_rect.collidepoint(mouse_pos):
+                         current_res_index = (current_res_index + 1) % len(AVAILABLE_RESOLUTIONS)
+                         settings_changed = True; clicked = True
+                    elif fs_rect.collidepoint(mouse_pos):
+                         current_fullscreen = not current_fullscreen
+                         settings_changed = True; clicked = True
+                    elif settings_changed and apply_button_rect.collidepoint(mouse_pos):
+                         # Застосовуємо і зберігаємо
+                         self.settings["graphics"]["resolution"] = AVAILABLE_RESOLUTIONS[current_res_index]
+                         self.settings["graphics"]["fullscreen"] = current_fullscreen
+                         self._apply_graphics_settings() # Перестворюємо екран
+                         save_json_file(SETTINGS_FILE, self.settings)
+                         settings_changed = False # Скидаємо прапорець змін
+                         clicked = True
+                    elif back_button_rect.collidepoint(mouse_pos):
+                         # Якщо були незбережені зміни, можна додати попередження
+                         submenu_active = False; return # Повернення до головного меню налаштувань
+
+                    if clicked: self.play_sound("click")
+
+            self.clock.tick(self.settings["graphics"]["fps"])
+
+
+    def show_skin_settings(self):
+        """Підменю вибору скіна змійки."""
+        submenu_active = True
+        current_color = tuple(self.settings["appearance"]["skin_color"]) # Поточний колір (кортеж для порівняння)
+
+        # Створюємо кнопки для кожного скіна
+        skin_buttons = []
+        button_width = 150
+        button_height = 50
+        spacing = 20
+        cols = 3 # Кількість колонок
+        skin_names = list(PREDEFINED_SKINS.keys())
+        rows = (len(skin_names) + cols - 1) // cols
+
+        total_grid_width = cols * button_width + (cols - 1) * spacing
+        start_x = (self.width - total_grid_width) // 2
+        start_y = 150
+
+        for i, name in enumerate(skin_names):
+             col = i % cols
+             row = i // cols
+             x = start_x + col * (button_width + spacing)
+             y = start_y + row * (button_height + spacing)
+             rect = pygame.Rect(x, y, button_width, button_height)
+             skin_buttons.append((rect, name, tuple(PREDEFINED_SKINS[name]))) # Зберігаємо rect, ім'я, колір (кортеж)
+
+        back_button_rect = pygame.Rect(self.width // 2 - 100, self.height - 80, 200, 50)
+
+        while submenu_active:
+            self.screen.fill(BG_COLOR)
+            title = self.font.render(self.get_text("skin_select"), True, TEXT_COLOR)
+            title_rect = title.get_rect(center=(self.width // 2, 80))
+            self.screen.blit(title, title_rect)
+
+            mouse_pos = pygame.mouse.get_pos()
+
+            # Малюємо кнопки скінів
+            for rect, name, color_tuple in skin_buttons:
+                 # Виділяємо поточний скін або при наведенні
+                 is_current = (color_tuple == current_color)
+                 is_hover = rect.collidepoint(mouse_pos)
+                 btn_color = HOVER_COLOR if is_hover else BUTTON_COLOR
+                 border_color = TEXT_COLOR if is_current else None # Обводка для поточного
+
+                 pygame.draw.rect(self.screen, btn_color, rect, border_radius=10)
+                 if border_color:
+                      pygame.draw.rect(self.screen, border_color, rect, border_radius=10, width=3) # Обводка
+
+                 # Малюємо колір скіна всередині кнопки
+                 color_preview_rect = pygame.Rect(rect.left + 5, rect.top + 5, rect.height - 10, rect.height - 10)
+                 pygame.draw.rect(self.screen, color_tuple, color_preview_rect, border_radius=5)
+
+                 # Назва кольору
+                 label = self.small_font.render(name, True, TEXT_COLOR) # Менший шрифт
+                 label_rect = label.get_rect(midleft=(color_preview_rect.right + 10, rect.centery))
+                 self.screen.blit(label, label_rect)
+
+            # Кнопка Назад
+            back_color = HOVER_COLOR if back_button_rect.collidepoint(mouse_pos) else BUTTON_COLOR
+            pygame.draw.rect(self.screen, back_color, back_button_rect, border_radius=10)
+            back_label = self.font.render(self.get_text("back"), True, TEXT_COLOR)
+            self.screen.blit(back_label, back_label.get_rect(center=back_button_rect.center))
+
+            pygame.display.flip()
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT: self.exit_game()
+                elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                     save_json_file(SETTINGS_FILE, self.settings); submenu_active = False; return
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    if back_button_rect.collidepoint(mouse_pos):
+                         save_json_file(SETTINGS_FILE, self.settings); submenu_active = False; return
+
+                    for rect, name, color_tuple in skin_buttons:
+                         if rect.collidepoint(mouse_pos):
+                              self.settings["appearance"]["skin_color"] = list(color_tuple) # Зберігаємо як список
+                              current_color = color_tuple # Оновлюємо для візуального виділення
+                              self.play_sound("click")
+                              break # Виходимо з циклу кнопок
+
+            self.clock.tick(self.settings["graphics"]["fps"])
+
+
+    def show_language_settings(self):
+        """Підменю вибору мови."""
+        submenu_active = True
+        available_languages = list(LANGUAGES.keys())
+
+        button_width = 300; button_height = 50; spacing = 15
+        lang_buttons = []
+        start_y = self.height // 2 - (len(available_languages) * (button_height + spacing)) // 2
+
+        for i, lang_code in enumerate(available_languages):
+             rect = pygame.Rect(self.width // 2 - button_width // 2, start_y + i * (button_height + spacing), button_width, button_height)
+             lang_buttons.append((rect, lang_code))
+
+        back_button_rect = pygame.Rect(self.width // 2 - 100, self.height - 80, 200, 50)
+
+        while submenu_active:
+            self.screen.fill(BG_COLOR)
+            title = self.font.render(self.get_text("language"), True, TEXT_COLOR) # Використовуємо ключ "language" для заголовку
+            title_rect = title.get_rect(center=(self.width // 2, start_y - 60))
+            self.screen.blit(title, title_rect)
+
+            mouse_pos = pygame.mouse.get_pos()
+
+            # Малюємо кнопки мов
+            for rect, lang_code in lang_buttons:
+                 is_current = (lang_code == self.settings["profile"]["language"])
+                 is_hover = rect.collidepoint(mouse_pos)
+                 btn_color = HOVER_COLOR if is_hover else BUTTON_COLOR
+                 border_color = TEXT_COLOR if is_current else None
+
+                 pygame.draw.rect(self.screen, btn_color, rect, border_radius=10)
+                 if border_color:
+                      pygame.draw.rect(self.screen, border_color, rect, border_radius=10, width=3)
+
+                 # Назва мови (можна додати прапори або повні назви)
+                 label = self.font.render(lang_code.upper(), True, TEXT_COLOR)
+                 self.screen.blit(label, label.get_rect(center=rect.center))
+
+            # Кнопка Назад
+            back_color = HOVER_COLOR if back_button_rect.collidepoint(mouse_pos) else BUTTON_COLOR
+            pygame.draw.rect(self.screen, back_color, back_button_rect, border_radius=10)
+            back_label = self.font.render(self.get_text("back"), True, TEXT_COLOR)
+            self.screen.blit(back_label, back_label.get_rect(center=back_button_rect.center))
+
+            pygame.display.flip()
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT: self.exit_game()
+                elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                     save_json_file(SETTINGS_FILE, self.settings); submenu_active = False; return
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    if back_button_rect.collidepoint(mouse_pos):
+                         save_json_file(SETTINGS_FILE, self.settings); submenu_active = False; return
+
+                    for rect, lang_code in lang_buttons:
+                         if rect.collidepoint(mouse_pos):
+                              self.settings["profile"]["language"] = lang_code
+                              self.play_sound("click")
+                              # Не виходимо, дозволяємо вибрати іншу мову
+                              break
+
+            self.clock.tick(self.settings["graphics"]["fps"])
+
+
+    # --- Інші методи гри (level_select_menu, show_leaderboard, change_nickname_menu, run_game і т.д.) ---
+    # Залишаються переважно без змін, але можуть потребувати адаптації до нової структури налаштувань,
+    # наприклад, використання self.settings["appearance"]["skin_color"] при малюванні змійки.
+
+    def level_select_menu(self): # Без змін логіки, тільки UI
+        selected_level_index = None; menu_active = True; cols = 5; button_size = 100; spacing = 20
+        total_grid_width = cols * button_size + (cols - 1) * spacing; start_x = (self.width - total_grid_width) // 2; start_y = 150
+        unlocked_levels = self.level_progress.get("unlocked_levels", [0]); level_buttons = []
+        for i in range(len(self.levels)): col = i % cols; row = i // cols; x = start_x + col * (button_size + spacing); y = start_y + row * (button_size + spacing); rect = pygame.Rect(x, y, button_size, button_size); level_buttons.append((rect, i))
+        back_button_rect = pygame.Rect(self.width // 2 - 100, self.height - 80, 200, 50)
+        while menu_active:
+            self.screen.fill(BG_COLOR); title = self.font.render(self.get_text("level_select"), True, TEXT_COLOR); title_rect = title.get_rect(center=(self.width // 2, 70)); self.screen.blit(title, title_rect)
+            mouse_pos = pygame.mouse.get_pos()
+            for rect, i in level_buttons:
+                is_unlocked = i in unlocked_levels; color = UNLOCKED_LEVEL_COLOR if is_unlocked else LOCKED_LEVEL_COLOR
+                if is_unlocked and rect.collidepoint(mouse_pos): color = HOVER_COLOR
+                pygame.draw.rect(self.screen, color, rect, border_radius=10)
+                if is_unlocked: text = self.font.render(str(i + 1), True, (0,0,0) if color == UNLOCKED_LEVEL_COLOR else TEXT_COLOR); text_rect = text.get_rect(center=rect.center); self.screen.blit(text, text_rect)
+                else: self.draw_emoji("lock", rect.centerx - 32, rect.centery - 32, 64)
+            back_color = HOVER_COLOR if back_button_rect.collidepoint(mouse_pos) else BUTTON_COLOR; pygame.draw.rect(self.screen, back_color, back_button_rect, border_radius=10)
+            back_label = self.font.render(self.get_text("back"), True, TEXT_COLOR); back_label_rect = back_label.get_rect(center=back_button_rect.center); self.screen.blit(back_label, back_label_rect)
+            pygame.display.flip()
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT: self.exit_game()
+                elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE: menu_active = False; self.show_menu(); return
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    if back_button_rect.collidepoint(event.pos): self.play_sound("click"); menu_active = False; self.show_menu(); return
+                    for rect, i in level_buttons:
+                        if rect.collidepoint(event.pos) and i in unlocked_levels: self.play_sound("click"); selected_level_index = i; menu_active = False; break
+            self.clock.tick(self.settings["graphics"]["fps"])
+        if selected_level_index is not None: self.run_game_with_level(selected_level_index)
+
+    def show_leaderboard(self): # Без змін логіки, тільки UI
+        menu_active = True; back_button_rect = pygame.Rect(self.width // 2 - 100, self.height - 80, 200, 50)
+        valid_entries = [entry for entry in self.leaderboard if isinstance(entry, dict)]; sorted_leaderboard = sorted(valid_entries, key=lambda x: x.get("score", 0), reverse=True)
+        while menu_active:
+            self.screen.fill(BG_COLOR); title = self.font.render(self.get_text("leaderboard"), True, TEXT_COLOR); title_rect = title.get_rect(center=(self.width // 2, 70)); self.screen.blit(title, title_rect)
+            mouse_pos = pygame.mouse.get_pos(); start_y = 150; entry_height = 40
+            for i, entry in enumerate(sorted_leaderboard[:10]): nickname = entry.get("nickname", "???"); score = entry.get("score", 0); text = f"{i+1}. {nickname} - {score}"; label = self.font.render(text, True, TEXT_COLOR); label_rect = label.get_rect(center=(self.width // 2, start_y + i * entry_height)); self.screen.blit(label, label_rect)
+            back_color = HOVER_COLOR if back_button_rect.collidepoint(mouse_pos) else BUTTON_COLOR; pygame.draw.rect(self.screen, back_color, back_button_rect, border_radius=10)
+            back_label = self.font.render(self.get_text("back"), True, TEXT_COLOR); back_label_rect = back_label.get_rect(center=back_button_rect.center); self.screen.blit(back_label, back_label_rect)
+            pygame.display.flip()
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT: self.exit_game()
+                elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE: menu_active = False; self.show_menu(); return
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    if back_button_rect.collidepoint(event.pos): self.play_sound("click"); menu_active = False; self.show_menu(); return
+            self.clock.tick(self.settings["graphics"]["fps"])
+
+    def save_score_to_leaderboard(self, score, is_training): # Без змін
+        if not isinstance(score, (int, float)) or score <= 0: print(f"Рахунок {score} не буде збережено."); return
+        nickname = self.settings["profile"]["nickname"];
+        if is_training: nickname += f" {self.get_text('training_suffix')}"
+        if not isinstance(self.leaderboard, list): self.leaderboard = []
+        self.leaderboard = [entry for entry in self.leaderboard if isinstance(entry, dict)]
+        self.leaderboard.append({"nickname": nickname, "score": int(score)})
+        self.leaderboard = sorted(self.leaderboard, key=lambda x: x.get("score", 0), reverse=True)[:10]
+        save_json_file(LEADERBOARD_FILE, self.leaderboard); print(f"Рахунок {int(score)} для {nickname} збережено.")
+
+    def change_nickname_menu(self): # Без змін логіки, тільки UI
+        input_active = True; current_nickname = self.settings["profile"]["nickname"]; max_nickname_length = 15
+        input_box_rect = pygame.Rect(self.width // 2 - 150, self.height // 2 - 30, 300, 60); back_button_rect = pygame.Rect(self.width // 2 - 100, self.height - 100, 200, 50)
+        while input_active:
+            self.screen.fill(BG_COLOR); title = self.font.render(self.get_text("change_nickname"), True, TEXT_COLOR); title_rect = title.get_rect(center=(self.width // 2, 150)); self.screen.blit(title, title_rect)
+            mouse_pos = pygame.mouse.get_pos(); pygame.draw.rect(self.screen, BUTTON_COLOR, input_box_rect, border_radius=10)
+            nickname_surface = self.font.render(current_nickname, True, TEXT_COLOR); nickname_rect = nickname_surface.get_rect(midleft=(input_box_rect.left + 15, input_box_rect.centery)); self.screen.blit(nickname_surface, nickname_rect)
+            back_color = HOVER_COLOR if back_button_rect.collidepoint(mouse_pos) else BUTTON_COLOR; pygame.draw.rect(self.screen, back_color, back_button_rect, border_radius=10)
+            back_label = self.font.render(self.get_text("back"), True, TEXT_COLOR); back_label_rect = back_label.get_rect(center=back_button_rect.center); self.screen.blit(back_label, back_label_rect)
+            pygame.display.flip()
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT: self.exit_game()
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE: input_active = False; self.show_menu(); return
+                    elif event.key == pygame.K_RETURN:
+                        if current_nickname: self.settings["profile"]["nickname"] = current_nickname; save_json_file(SETTINGS_FILE, self.settings)
+                        input_active = False; self.show_menu(); return
+                    elif event.key == pygame.K_BACKSPACE: current_nickname = current_nickname[:-1]
+                    else:
+                        if len(current_nickname) < max_nickname_length and (event.unicode.isalnum() or event.unicode == ' '): current_nickname += event.unicode
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    if back_button_rect.collidepoint(event.pos): self.play_sound("click"); input_active = False; self.show_menu(); return
+            self.clock.tick(self.settings["graphics"]["fps"])
+
+    def run_game(self, training=False, start_level=None): # Логіка швидкості та UI виправлена
+        self.game_running = True; self.training_mode = training; self.paused = False; self.score = 0
+        self.next_level_available = False; self.new_level_unlocked_message = ""; self._start_next_level_on_exit = False
+        self.current_level = None # Скидаємо за замовчуванням
+
+        game_fps = self.settings["gameplay"]["default_speed"] # Типова швидкість
+
+        if self.training_mode:
+            self.play_music("training"); self.start_snake(); print("Запуск тренувального режиму.")
+        elif start_level is not None: # Якщо запускаємо конкретний рівень
+             if self.levels and 0 <= start_level < len(self.levels):
+                 self.current_level = start_level; level_data = self.levels[self.current_level]
+                 self.play_music("level", level_data); self.start_snake_with_level(level_data)
+                 game_fps = level_data.get("speed", game_fps); print(f"Запуск рівня {self.current_level + 1}.")
+             else: # Помилка індексу рівня
+                 print(f"Помилка: Невірний індекс рівня {start_level}. Запуск типової гри."); self.play_music("game"); self.start_snake(); self.current_level = None
+        else: # "Грати" з меню (start_level is None)
+             print("Запуск типової гри (без рівнів)."); self.play_music("game"); self.start_snake(); self.current_level = None # Явно вказуємо, що рівня немає
+
+        while self.game_running:
+            self.handle_events();
+            if not self.game_running: break
+            if not self.paused: self.update_snake(); self.check_collisions();
+            if not self.game_running: break
+            if not self.paused: self.check_level_completion() # Перевірка тільки якщо не на паузі
+            self.draw_game_state()
+            self.clock.tick(game_fps)
+
+        if self.score > 0: self.save_score_to_leaderboard(self.score, self.training_mode)
+        if self._start_next_level_on_exit:
+             self._start_next_level_on_exit = False; next_level_index = self.current_level + 1
+             if self.levels and 0 <= next_level_index < len(self.levels): self.run_game_with_level(next_level_index)
+             else: self.show_menu()
+        elif not self.paused: self.show_game_over_screen(self.score)
+
+    def run_game_with_level(self, level_index): # Без змін
+        self.run_game(training=False, start_level=level_index)
+
+    def start_snake(self): # Без змін
+        self.head_pos = pygame.math.Vector2(int(self.width // 2 // CELL_SIZE * CELL_SIZE), int(self.height // 2 // CELL_SIZE * CELL_SIZE))
+        self.direction_vector = pygame.math.Vector2(CELL_SIZE, 0); self.next_direction = self.direction_vector.copy()
+        start_length = 3; self.snake = [pygame.math.Vector2(self.head_pos.x - i * CELL_SIZE, self.head_pos.y) for i in range(start_length)]
+        self.score = 0; self.foods = []; self.foods = self._generate_multiple_foods(5)
+        print("Змійку ініціалізовано для типової гри/тренування.")
+
+    def start_snake_with_level(self, level_data): # Без змін
+        start_x = level_data.get("start_x_ratio", 0.5) * self.width; start_y = level_data.get("start_y_ratio", 0.5) * self.height
+        self.head_pos = pygame.math.Vector2(int(start_x // CELL_SIZE * CELL_SIZE), int(start_y // CELL_SIZE * CELL_SIZE))
+        self.direction_vector = pygame.math.Vector2(CELL_SIZE, 0); self.next_direction = self.direction_vector.copy()
+        start_length = level_data.get("start_length", 3); self.snake = [pygame.math.Vector2(self.head_pos.x - i * CELL_SIZE, self.head_pos.y) for i in range(start_length)]
+        self.score = 0; food_count = level_data.get("food_count", 5); special_chance = level_data.get("special_food_chance", 0.1)
+        self.foods = []; self.foods = self._generate_multiple_foods(food_count, special_chance)
+        self.obstacles = level_data.get("obstacles", []); print(f"Змійку ініціалізовано для рівня '{level_data.get('name', '?')}'")
+
+    def handle_events(self): # Перероблено для обробки паузи
+        mouse_pos = pygame.mouse.get_pos()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT: self.game_running = False; self.running = False; return
+            # --- Обробка подій ПАУЗИ ---
+            if self.paused:
+                if event.type == pygame.KEYDOWN:
+                    try: pause_key = getattr(pygame, self.settings["controls"]["pause"])
+                    except AttributeError: pause_key = K_ESCAPE
+                    if event.key == pause_key: self.toggle_pause(); return
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    # Визначаємо кнопки паузи
+                    button_width = 300; button_height = 60; spacing = 30
+                    pause_buttons_data = [("continue", self.get_text("continue")), ("settings", self.get_text("settings")), ("menu", self.get_text("menu"))]
+                    pause_button_rects = []
+                    start_y = self.height // 2 - (len(pause_buttons_data) * (button_height + spacing)) // 2
+                    for i in range(len(pause_buttons_data)): rect = pygame.Rect(self.width // 2 - button_width // 2, start_y + i * (button_height + spacing), button_width, button_height); pause_button_rects.append((rect, pause_buttons_data[i][0]))
+                    clicked_action = None
+                    for rect, action_key in pause_button_rects:
+                        if rect.collidepoint(mouse_pos): clicked_action = action_key; self.play_sound("click"); break
+                    if clicked_action == "continue": self.toggle_pause(); return
+                    elif clicked_action == "settings": self.show_settings_menu(); return # Повернеться до паузи
+                    elif clicked_action == "menu": self.paused = False; self.game_running = False; self.show_menu(); return
+            # --- Обробка ІГРОВИХ подій (якщо НЕ на паузі) ---
+            else:
+                if event.type == pygame.KEYDOWN:
+                    key_pressed = event.key; controls = self.settings["controls"]; target_direction = None
+                    try: up_key, down_key, left_key, right_key, pause_key = getattr(pygame, controls["up"]), getattr(pygame, controls["down"]), getattr(pygame, controls["left"]), getattr(pygame, controls["right"]), getattr(pygame, controls["pause"])
+                    except AttributeError: print("Помилка клавіш"); up_key, down_key, left_key, right_key, pause_key = K_UP, K_DOWN, K_LEFT, K_RIGHT, K_ESCAPE
+                    if key_pressed == up_key and self.direction_vector.y == 0: target_direction = pygame.math.Vector2(0, -CELL_SIZE)
+                    elif key_pressed == down_key and self.direction_vector.y == 0: target_direction = pygame.math.Vector2(0, CELL_SIZE)
+                    elif key_pressed == left_key and self.direction_vector.x == 0: target_direction = pygame.math.Vector2(-CELL_SIZE, 0)
+                    elif key_pressed == right_key and self.direction_vector.x == 0: target_direction = pygame.math.Vector2(CELL_SIZE, 0)
+                    elif key_pressed == pause_key: self.toggle_pause(); return
+                    if target_direction and (len(self.snake) <= 1 or target_direction != -self.direction_vector): self.next_direction = target_direction
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                     if self.next_level_available and self.next_button_rect and self.next_button_rect.collidepoint(mouse_pos):
+                         self.play_sound("click"); self.next_level_available = False; self.game_running = False; self._start_next_level_on_exit = True; return
+
+    def update_snake(self): # Без змін
+        self.direction_vector = self.next_direction; new_head_pos = self.snake[0] + self.direction_vector; self.snake.insert(0, new_head_pos)
+        if not self.training_mode and (new_head_pos.x < 0 or new_head_pos.x >= self.width or new_head_pos.y < 0 or new_head_pos.y >= self.height): self.play_sound("collision"); self.game_running = False; return
+        ate_food = False
+        for food in self.foods[:]:
+            if new_head_pos == food['pos']:
+                self.score += food['points']; self.play_sound("eat"); self.foods.remove(food)
+                new_food_pos, new_food_type, new_food_points = self._generate_single_food()
+                self.foods.append({'pos': new_food_pos, 'type': new_food_type, 'points': new_food_points})
+                ate_food = True; break
+        if not ate_food: self.snake.pop()
+
+    def check_collisions(self): # Без змін
+        head = self.snake[0]; body = self.snake[1:]
+        for segment in body:
+            if head == segment: self.play_sound("collision"); self.game_running = False; return
+        # TODO: Зіткнення з перешкодами
+
+    def check_level_completion(self): # Без змін
+         if self.current_level is not None and not self.training_mode:
+             try:
+                 level_data = self.levels[self.current_level]; target_score = level_data.get("target_score")
+                 if target_score is not None and self.score >= target_score and not self.new_level_unlocked_message:
+                     next_level_index = self.current_level + 1; unlocked = self.level_progress.get("unlocked_levels", [0])
+                     if next_level_index < len(self.levels):
+                         if next_level_index not in unlocked: self.level_progress["unlocked_levels"].append(next_level_index); save_json_file(LEVEL_PROGRESS_FILE, self.level_progress); self.new_level_unlocked_message = f"{self.get_text('next_level_unlocked')} ({next_level_index + 1})"; self.new_level_timer = pygame.time.get_ticks(); self.next_level_available = True; print(f"Рівень {self.current_level + 1} пройдено! Відкрито рівень {next_level_index + 1}.")
+                         else: self.new_level_unlocked_message = f"🎉 Рівень {self.current_level + 1} пройдено! 🎉"; self.new_level_timer = pygame.time.get_ticks(); self.next_level_available = True; print(f"Рівень {self.current_level + 1} пройдено (вже був відкритий наступний).")
+                     elif next_level_index >= len(self.levels): self.new_level_unlocked_message = "🎉 Вітаємо! Всі рівні пройдено! 🎉"; self.new_level_timer = pygame.time.get_ticks(); self.next_level_available = False; print("Пройдено останній рівень!")
+             except (IndexError, KeyError, TypeError) as e: print(f"Помилка перевірки завершення рівня: {e}")
+
+    def draw_game_state(self): # Використовує колір скіна
+        self.screen.fill(BG_COLOR)
+        snake_skin_color = tuple(self.settings["appearance"]["skin_color"]) # Беремо колір з налаштувань
+        for i, segment in enumerate(self.snake):
+            # Голова може бути трохи яскравішою
+            color_multiplier = 1.0 if i > 0 else 1.1 # Зробити голову трохи яскравішою
+            color = tuple(min(255, int(c * color_multiplier)) for c in snake_skin_color)
+            pygame.draw.rect(self.screen, color, (segment.x, segment.y, CELL_SIZE, CELL_SIZE), border_radius=3)
+        for food in self.foods: color = SPECIAL_FOOD_COLOR if food['type'] == "special" else FOOD_COLOR; pygame.draw.rect(self.screen, color, (food['pos'].x, food['pos'].y, CELL_SIZE, CELL_SIZE), border_radius=5)
+        # TODO: Малюємо перешкоди
+        score_text = self.font.render(f"{self.get_text('score')}: {self.score}", True, TEXT_COLOR); self.screen.blit(score_text, (10, 10))
+        # --- Змінено: Показуємо інфо рівня тільки якщо current_level встановлено ---
+        if self.current_level is not None and not self.training_mode:
+            try:
+                level_data = self.levels[self.current_level]; level_name = level_data.get("name", f"Рівень {self.current_level + 1}")
+                level_text = self.font.render(f"{self.get_text('level')}: {level_name}", True, TEXT_COLOR); level_rect = level_text.get_rect(topright=(self.width - 10, 10)); self.screen.blit(level_text, level_rect)
+                target_score = level_data.get("target_score")
+                if target_score is not None:
+                    remaining = max(0, target_score - self.score); target_text_str = f"{self.get_text('to_next_level')}: {remaining} {self.get_text('points_abbr')}" if remaining > 0 else f"Ціль: {target_score} (Досягнуто!)"
+                    target_color = INFO_TEXT_COLOR if remaining > 0 else TEXT_COLOR; target_text = self.font.render(target_text_str, True, target_color); target_rect = target_text.get_rect(topleft=(10, 40)); self.screen.blit(target_text, target_rect)
+            except (IndexError, KeyError, TypeError): pass
+        # Повідомлення про новий рівень
+        if self.new_level_unlocked_message and pygame.time.get_ticks() - self.new_level_timer < 4000:
+            msg_font = pygame.font.Font(None, 48); msg = msg_font.render(self.new_level_unlocked_message, True, (255, 215, 0)); msg_rect = msg.get_rect(center=(self.width // 2, self.height // 2 - 100)); self.screen.blit(msg, msg_rect)
+            self.draw_emoji("trophy", msg_rect.centerx - 32, msg_rect.top - 70)
+            if self.next_level_available:
+                next_btn_width = 300; next_btn_height = 60; self.next_button_rect = pygame.Rect(self.width // 2 - next_btn_width // 2, self.height // 2, next_btn_width, next_btn_height)
+                mouse_pos = pygame.mouse.get_pos(); btn_color = HOVER_COLOR if self.next_button_rect.collidepoint(mouse_pos) else UNLOCKED_LEVEL_COLOR
+                pygame.draw.rect(self.screen, btn_color, self.next_button_rect, border_radius=10); next_label = self.font.render(self.get_text("next_level_button"), True, (0, 0, 0)); next_label_rect = next_label.get_rect(center=self.next_button_rect.center); self.screen.blit(next_label, next_label_rect)
+            else: self.next_button_rect = None
+        elif self.new_level_unlocked_message and pygame.time.get_ticks() - self.new_level_timer >= 4000: self.new_level_unlocked_message = ""; self.next_level_available = False; self.next_button_rect = None
+        if self.paused: self.draw_pause_overlay() # Малювання паузи перенесено сюди
+        pygame.display.flip() # Один flip наприкінці малювання кадру
+
+    def _generate_single_food(self, special_chance=0.1): # Виправлено в v3
+        loop_count = 0; max_loops = (self.width // CELL_SIZE) * (self.height // CELL_SIZE)
+        while loop_count < max_loops:
+            x = random.randrange(0, self.width // CELL_SIZE) * CELL_SIZE; y = random.randrange(0, self.height // CELL_SIZE) * CELL_SIZE
+            pos = pygame.math.Vector2(x, y); on_snake = any(pos == segment for segment in self.snake)
+            if on_snake: loop_count += 1; continue
+            on_food = any(pos == food['pos'] for food in self.foods)
+            if on_food: loop_count += 1; continue
+            # TODO: Перевірка на перешкоди
+            food_type = "special" if random.random() < special_chance else "normal"; points = 5 if food_type == "special" else 1
+            return pos, food_type, points
+        print("ПОПЕРЕДЖЕННЯ: Не вдалося знайти вільне місце для їжі!"); return pygame.math.Vector2(0, 0), "normal", 1
+
+    def _generate_multiple_foods(self, count, special_chance=0.1): # Виправлено в v3
+        foods = []; current_foods_positions = set()
+        for _ in range(count):
+             loop_count = 0; max_loops = (self.width // CELL_SIZE) * (self.height // CELL_SIZE)
+             while loop_count < max_loops:
+                  x = random.randrange(0, self.width // CELL_SIZE) * CELL_SIZE; y = random.randrange(0, self.height // CELL_SIZE) * CELL_SIZE
+                  pos = pygame.math.Vector2(x, y); pos_tuple = (int(pos.x), int(pos.y))
+                  on_snake = any(pos == segment for segment in self.snake); on_existing_food = pos_tuple in current_foods_positions
+                  if not on_snake and not on_existing_food:
+                       food_type = "special" if random.random() < special_chance else "normal"; points = 5 if food_type == "special" else 1
+                       foods.append({'pos': pos, 'type': food_type, 'points': points}); current_foods_positions.add(pos_tuple); break
+                  loop_count += 1
+             else: print("ПОПЕРЕДЖЕННЯ: Не вдалося згенерувати всю їжу без накладання!")
+        return foods
+
+    def toggle_pause(self): # Без змін
+        self.paused = not self.paused
+        if self.paused: pygame.mixer.music.pause(); print("Гру поставлено на паузу.")
+        else: pygame.mixer.music.unpause(); print("Гру знято з паузи.")
+
+    def draw_pause_overlay(self): # Тепер тільки малює, логіка в handle_events
+        overlay = pygame.Surface((self.width, self.height), pygame.SRCALPHA); overlay.fill(PAUSE_OVERLAY_COLOR); self.screen.blit(overlay, (0, 0))
+        pause_font = pygame.font.Font(None, 50); button_width = 300; button_height = 60; spacing = 30
+        pause_buttons_data = [("continue", self.get_text("continue")), ("settings", self.get_text("settings")), ("menu", self.get_text("menu"))]
+        pause_button_rects = []
+        start_y = self.height // 2 - (len(pause_buttons_data) * (button_height + spacing)) // 2
+        for i in range(len(pause_buttons_data)): rect = pygame.Rect(self.width // 2 - button_width // 2, start_y + i * (button_height + spacing), button_width, button_height); pause_button_rects.append(rect)
+        title = pause_font.render(self.get_text("pause_title"), True, TEXT_COLOR); title_rect = title.get_rect(center=(self.width // 2, start_y - 80)); self.screen.blit(title, title_rect)
+        mouse_pos = pygame.mouse.get_pos()
+        for i, rect in enumerate(pause_button_rects):
+            key, text = pause_buttons_data[i]; color = HOVER_COLOR if rect.collidepoint(mouse_pos) else BUTTON_COLOR
+            pygame.draw.rect(self.screen, color, rect, border_radius=10); label = pause_font.render(text, True, TEXT_COLOR); label_rect = label.get_rect(center=rect.center); self.screen.blit(label, label_rect)
+
+    def show_game_over_screen(self, final_score): # Без змін логіки, тільки UI
+        self.play_music("menu"); menu_active = True
+        retry_button_rect = pygame.Rect(self.width // 2 - 150, self.height // 2, 300, 60); menu_button_rect = pygame.Rect(self.width // 2 - 150, self.height // 2 + 80, 300, 60)
+        while menu_active:
+            self.screen.fill(BG_COLOR); title_font = pygame.font.Font(None, 70); title = title_font.render(self.get_text("game_over"), True, ERROR_TEXT_COLOR); title_rect = title.get_rect(center=(self.width // 2, self.height // 3)); self.screen.blit(title, title_rect)
+            self.draw_emoji("skull", title_rect.centerx - 32, title_rect.top - 80)
+            score_text = self.font.render(f"{self.get_text('score')}: {int(final_score)}", True, TEXT_COLOR); score_rect = score_text.get_rect(center=(self.width // 2, self.height // 2 - 50)); self.screen.blit(score_text, score_rect)
+            mouse_pos = pygame.mouse.get_pos(); buttons = [(retry_button_rect, self.get_text("retry")), (menu_button_rect, self.get_text("menu"))]
+            for rect, text in buttons: color = HOVER_COLOR if rect.collidepoint(mouse_pos) else BUTTON_COLOR; pygame.draw.rect(self.screen, color, rect, border_radius=10); label = self.font.render(text, True, TEXT_COLOR); label_rect = label.get_rect(center=rect.center); self.screen.blit(label, label_rect)
+            pygame.display.flip()
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT: self.exit_game()
+                elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE: menu_active = False; self.show_menu(); return
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    if retry_button_rect.collidepoint(event.pos):
+                        self.play_sound("click"); menu_active = False
+                        retry_level = self.current_level if self.current_level is not None else None
+                        self.run_game(training=self.training_mode, start_level=retry_level)
+                        return
+                    elif menu_button_rect.collidepoint(event.pos): self.play_sound("click"); menu_active = False; self.show_menu(); return
+            self.clock.tick(self.settings["graphics"]["fps"])
+
+    def show_critical_error_screen(self, error_message): # Без змін
+        try:
+            if not pygame.get_init(): pygame.init();
+            if not pygame.display.get_init(): pygame.display.init();
+            if not pygame.font.get_init(): pygame.font.init()
+            try: width, height = self.width, self.height
+            except AttributeError: width, height = 800, 600
+            try: screen = self.screen if hasattr(self, 'screen') and self.screen else pygame.display.set_mode((width, height))
+            except pygame.error: screen = pygame.display.set_mode((800, 600)); width, height = 800, 600
+            try: font = self.font if hasattr(self, 'font') and self.font else pygame.font.Font(None, 40)
+            except Exception: font = pygame.font.Font(None, 30)
+            screen.fill((30, 0, 0)); support_site = "afercorporftaon.onepage.me"
+            gt = self.get_text if hasattr(self, 'get_text') else lambda k: k.replace("_", " ").title()
+            error_texts = [ gt("error_title"), str(error_message), "", gt("error_restart"), gt("error_support"), f"{gt('error_site')} {support_site}" ]
+            link_rect = None; start_y = height // 2 - (len(error_texts) * 45) // 2
+            for i, line in enumerate(error_texts):
+                color = ERROR_TEXT_COLOR if i == 0 else INFO_TEXT_COLOR; max_width = width * 0.9; words = line.split(' '); lines_to_render = []; current_line = ""
+                for word in words: test_line = current_line + word + " "; test_surface = font.render(test_line, True, color);
+                if test_surface.get_width() < max_width: current_line = test_line
+                else: lines_to_render.append(current_line.strip()); current_line = word + " "
+                lines_to_render.append(current_line.strip())
+                line_offset = 0
+                for render_line in lines_to_render: rendered = font.render(render_line, True, color); rect = rendered.get_rect(center=(width // 2, start_y + i * 45 + line_offset)); screen.blit(rendered, rect); line_offset += font.get_height();
+                if gt('error_site') in render_line: link_rect = pygame.Rect(rect.left, start_y + i * 45, rect.width, len(lines_to_render) * font.get_height()); pygame.draw.line(screen, INFO_TEXT_COLOR, rect.bottomleft, rect.bottomright, 1)
+            pygame.display.flip(); waiting = True; clock = pygame.time.Clock()
+            while waiting:
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE): waiting = False
+                    elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                         if link_rect and link_rect.collidepoint(event.pos):
+                            try: webbrowser.open(f"https://{support_site}")
+                            except Exception as wb_err: print(f"Не вдалося відкрити посилання: {wb_err}")
+                clock.tick(15)
+        except Exception as display_err: print(f"Крит. помилка показу екрану помилки.\nПочаткова: {error_message}\nВідображення: {display_err}"); log_exception()
+
+    def exit_game(self): # Без змін
+        print("Завершення гри..."); pygame.quit(); sys.exit()
+
+    def run(self): # Без змін
+        if self.running: self.show_menu()
+        print("Вихід з головного методу run().")
+
+# --- Точка входу --- (Без змін)
+if __name__ == "__main__":
+    game_instance = None; exit_code = 0
+    try:
+        print("Запуск гри Змійка..."); game_instance = SnakeGame()
+        if game_instance.running: game_instance.run()
+        else: print("Ініціалізація гри не вдалася."); exit_code = 1
+    except Exception as main_err:
+        print(f"Неперехоплена помилка: {main_err}"); log_exception(); exit_code = 1
+        if game_instance and hasattr(game_instance, 'show_critical_error_screen'): game_instance.show_critical_error_screen(str(main_err))
+        else:
+             try: # Базовий екран помилки
+                 pygame.init(); screen = pygame.display.set_mode((800, 600)); pygame.display.set_caption("ПОМИЛКА"); font = pygame.font.Font(None, 40); screen.fill((30, 0, 0)); support_site = "afercorporftaon.onepage.me"
+                 error_texts = ["КРИТИЧНА ПОМИЛКА", str(main_err), "", "Перезапустіть гру.", f"Підтримка: {support_site}"]; start_y = 300 - (len(error_texts) * 50) // 2
+                 for i, line in enumerate(error_texts): rendered = font.render(line, True, (255,0,0) if i==0 else (200,200,200)); rect = rendered.get_rect(center=(400, start_y + i * 50)); screen.blit(rendered, rect)
+                 pygame.display.flip(); waiting = True
+                 while waiting:
+                     for event in pygame.event.get():
+                         if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE): waiting = False
+                     pygame.time.Clock().tick(15)
+             except Exception as fallback_err: print(f"Не вдалося показати базовий екран помилки: {fallback_err}")
+    finally: print(f"Завершення роботи Pygame з кодом {exit_code}."); pygame.quit(); sys.exit(exit_code)

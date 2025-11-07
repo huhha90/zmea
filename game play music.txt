@@ -1,0 +1,28 @@
+def play_music(self, music_type, level_data=None):
+        """Відтворює фонову музику залежно від типу."""
+        volume = self.settings["audio"]["music_volume"]; pygame.mixer.music.set_volume(volume)
+        if volume == 0: pygame.mixer.music.stop(); return
+        path = None
+        if music_type == "menu": path = resource_path("assets/music/menu_music.mp3")
+        elif music_type == "game": path = resource_path("assets/music/Snake_Rattle_Dendy.mp3") # Типова ігрова музика
+        elif music_type == "training": path = resource_path("assets/music/training-mode.mp3") # Музика для тренування
+        elif music_type == "level" and level_data:
+            level_music_file = level_data.get("music") # Спробувати отримати музику рівня
+            if level_music_file: # Якщо музика вказана для рівня
+                 path = resource_path(f"assets/levls/{level_music_file}")
+            else: # Якщо не вказана, використовуємо типову ігрову
+                 path = resource_path("assets/music/Snake_Rattle_Dendy.mp3")
+
+        if path and os.path.exists(path):
+            try:
+                 current_music = pygame.mixer.music.get_busy() # Перевірити, чи щось грає
+                 # Якщо грає та сама музика, не перезапускати
+                 # (Примітка: pygame не надає прямого способу отримати ім'я поточного файлу,
+                 # тому ми просто перезапускаємо, якщо тип змінився або музика не грає)
+                 pygame.mixer.music.stop()
+                 pygame.mixer.music.load(path)
+                 pygame.mixer.music.play(-1) # -1 для зациклювання
+            except Exception as e: print(f"Помилка музики {path}: {e}")
+        elif path: print(f"Попередження: Файл музики не знайдено: {path}")
+        elif music_type != "level": # Якщо це не рівень, а інший тип без шляху
+             print(f"Попередження: Немає шляху для музики типу '{music_type}'")

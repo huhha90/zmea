@@ -1,0 +1,576 @@
+import pygame
+import random
+import sys
+import os
+import json
+import traceback
+import datetime
+import webbrowser
+from pygame.locals import *
+
+WIDTH = 800
+HEIGHT = 600
+CELL_SIZE = 20
+BG_COLOR = (10, 10, 10)
+BUTTON_COLOR = (50, 50, 50)
+HOVER_COLOR = (100, 100, 100)
+TEXT_COLOR = (0, 255, 0)
+FOOD_COLOR = (255, 0, 0)
+SPECIAL_FOOD_COLOR = (0, 0, 255)
+SETTINGS_FILE = "settings.json"
+LEADERBOARD_FILE = "leaderboard.json"
+ERROR_LOG_FILE = "error_log.txt"
+FOOD_COUNT = 5
+SPECIAL_FOOD_CHANCE = 0.1
+
+# Логування помилок
+def log_exception():
+    with open(ERROR_LOG_FILE, "a", encoding="utf-8") as f:
+        f.write(f"\n=== [{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] ===\n")
+        traceback.print_exc(file=f)
+
+# === Функція для пошуку шляху до ресурсів (наприклад, для PyInstaller) ===
+def resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
+def load_leaderboard():
+    try:
+        with open(LEADERBOARD_FILE, "r", encoding="utf-8") as file:
+            return json.load(file)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+    
+# Збереження налаштувань
+def save_settings(settings):
+    with open("settings.json", "w") as f:
+        json.dump(settings, f)
+
+# Завантаження налаштувань
+def load_settings():
+    if os.path.exists("settings.json"):
+        with open("settings.json", "r") as f:
+            return json.load(f)
+    else:
+        return {
+            "sound": True,
+            "music": True,
+            "nickname": "Player",
+            "language": "uk"
+        }
+
+# Клас гри
+class SnakeGame:
+    def __init__(self):
+        pygame.init()
+        pygame.mixer.init()
+        self.width = 800
+        self.height = 600
+        self.play_menu_music()
+        self.font = pygame.font.Font(None, 36)
+        self.screen = pygame.display.set_mode((self.width, self.height))
+        self.leaderboard = ["Гравець 1", "Гравець 2"]
+        self.font = pygame.font.Font(None, 50)
+        self.settings = load_settings()
+        self.leaderboard = load_leaderboard()  # Завантажуємо таблицю лідерів
+        self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+        self.width, self.height = self.screen.get_size()
+        pygame.display.set_caption("ЗМІЙКА")
+        self.clock = pygame.time.Clock()
+        self.running = True
+        self.sounds = {
+            "eat": pygame.mixer.Sound(resource_path("assets/music/eat.wav")),
+            "collision": pygame.mixer.Sound(resource_path("assets/music/collision.wav")),
+            "click": pygame.mixer.Sound(resource_path("assets/music/click.wav"))
+        }
+        # Словник для мов
+        self.languages = {
+            "uk": {"play": "Грати", "train": "Тренування", "leaderboard": "Таблиця лідерів", "settings": "Налаштування", "exit": "Вихід", "save": "Зберегти", "change_nickname": "Змінити нік"},
+            "en": {"play": "Play", "train": "Training", "leaderboard": "Leaderboard", "settings": "Settings", "exit": "Exit", "save": "Save", "change_nickname": "Change Nickname"},
+            "ru": {"play": "Играть", "train": "Тренировка", "leaderboard": "Таблица лидеров", "settings": "Настройки", "exit": "Выход", "save": "Сохранить", "change_nickname": "Изменить ник"},
+            "pl": {"play": "Graj", "train": "Trening", "leaderboard": "Tabela liderów", "settings": "Ustawienia", "exit": "Wyjście", "save": "Zapisz", "change_nickname": "Zmień pseudonim"},
+            "de": {"play": "Spielen", "train": "Training", "leaderboard": "Bestenliste", "settings": "Einstellungen", "exit": "Beenden", "save": "Speichern", "change_nickname": "Nickname ändern"},
+            "ja": {"play": "プレイ", "train": "トレーニング", "leaderboard": "リーダーボード", "settings": "設定", "exit": "終了", "save": "保存", "change_nickname": "ニックネーム変更"},
+            "zh": {"play": "玩", "train": "训练", "leaderboard": "排行榜", "settings": "设置", "exit": "退出", "save": "保存", "change_nickname": "更改昵称"},
+            "be": {"play": "Гуляць", "train": "Трэніроўка", "leaderboard": "Табліца лідараў", "settings": "Налада", "exit": "Выход", "save": "Захаваць", "change_nickname": "Змяніць ніка"},
+            "cs": {"play": "Hrát", "train": "Trénink", "leaderboard": "Žebříček", "settings": "Nastavení", "exit": "Konec", "save": "Uložit", "change_nickname": "Změnit přezdívku"},
+            "tr": {"play": "Oyna", "train": "Antrenman", "leaderboard": "Lider Tablosu", "settings": "Ayarlar", "exit": "Çıkış", "save": "Kaydet", "change_nickname": "Takma ad değiştir"}
+        }
+        
+        self.show_menu()
+
+    def show_menu(self):
+     menu_active = True
+     while menu_active:
+        self.screen.fill(BG_COLOR)
+
+        # Заголовок
+        title_text = self.font.render("ЗМІЙКА", True, TEXT_COLOR)
+        self.screen.blit(title_text, (self.width // 2 - title_text.get_width() // 2, 100))
+
+        # Створення кнопок
+        buttons = [
+            self.languages[self.settings["language"]]["play"],
+            self.languages[self.settings["language"]]["train"],
+            self.languages[self.settings["language"]]["leaderboard"],
+            self.languages[self.settings["language"]]["change_nickname"],
+            self.languages[self.settings["language"]]["settings"],
+            self.languages[self.settings["language"]]["exit"]
+        ]
+
+        button_rects = []
+        for i, text in enumerate(buttons):
+            rect = pygame.Rect(self.width // 2 - 150, 250 + i * 80, 300, 60)
+            button_rects.append(rect)
+            pygame.draw.rect(self.screen, BUTTON_COLOR, rect, border_radius=10)
+            label = self.font.render(text, True, TEXT_COLOR)
+            self.screen.blit(label, (rect.centerx - label.get_width() // 2, rect.centery - label.get_height() // 2))
+
+        pygame.display.flip()  # Оновлення екрану після малювання всього меню
+
+        # Обробка подій
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.exit_game()
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                for i, rect in enumerate(button_rects):
+                    if rect.collidepoint(event.pos):
+                        if self.settings["sound"]:
+                            self.sounds["click"].play()
+                        if i == 0:
+                            menu_active = False
+                            self.run_game()
+                        elif i == 1:
+                            menu_active = False
+                            self.run_training_mode()
+                        elif i == 2:
+                            self.show_leaderboard()
+                        elif i == 3:
+                            self.change_nickname()
+                        elif i == 4:
+                            self.show_settings()
+                        elif i == 5:
+                            self.exit_game()
+
+
+    def show_leaderboard(self):
+                leaderboard_active = True
+                self.screen.fill(BG_COLOR)
+
+    # Створення кнопки "Назад"
+                back_button = pygame.Rect(self.width // 2 - 75, 600, 150, 50)
+
+    # Заголовок
+                title_text = self.font.render("Таблиця лідерів", True, TEXT_COLOR)
+                self.screen.blit(title_text, (self.width // 2 - title_text.get_width() // 2, 100))
+
+    # Вивід елементів таблиці
+                for i in range(len(self.leaderboard)):
+                 rect = pygame.Rect(self.width // 2 - 150, 250 + i * 80, 300, 60)
+                if isinstance(self.leaderboard[i], dict):
+                    text = f"{self.leaderboard[i]['nickname']} - {self.leaderboard[i]['score']}"
+                    label = self.font.render(text, True, TEXT_COLOR)
+                    self.screen.blit(label, (rect.centerx - label.get_width() // 2, rect.centery - label.get_height() // 2))
+
+    # Малювання кнопки
+                pygame.draw.rect(self.screen, BUTTON_COLOR, back_button, border_radius=10)
+                back_label = self.font.render("Назад", True, TEXT_COLOR)
+                self.screen.blit(back_label, (
+        back_button.centerx - back_label.get_width() // 2,
+        back_button.centery - back_label.get_height() // 2
+    ))
+
+                pygame.display.flip()
+
+    # Цикл подій
+                while leaderboard_active:
+                 for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                      self.exit_game()
+                    elif event.type == pygame.MOUSEBUTTONDOWN:
+                     if back_button.collidepoint(event.pos):
+                         leaderboard_active = False
+                         self.show_menu()
+
+    def save_score_to_leaderboard(self, training=False):
+     if self.score > 0:
+        nickname = self.settings.get("nickname", "Player")
+        if training:
+            nickname += " (тренування)"
+        self.leaderboard.append({
+            "nickname": nickname,
+            "score": self.score
+        })
+        self.leaderboard = sorted(self.leaderboard, key=lambda x: x["score"], reverse=True)[:10]
+        with open(LEADERBOARD_FILE, "w", encoding="utf-8") as file:
+            json.dump(self.leaderboard, file, indent=4)
+
+    def show_settings(self):
+        settings_active = True
+        while settings_active:
+            self.screen.fill(BG_COLOR)
+            title_text = self.font.render("Налаштування", True, TEXT_COLOR)
+            self.screen.blit(title_text, (WIDTH // 2 - title_text.get_width() // 2, 100))
+
+            sound_button = pygame.Rect(WIDTH // 2 - 150, 200, 300, 60)
+            music_button = pygame.Rect(WIDTH // 2 - 150, 300, 300, 60)
+            language_button = pygame.Rect(WIDTH // 2 - 150, 400, 300, 60)
+
+            # Зміна кольору кнопок
+            sound_color = HOVER_COLOR if self.settings["sound"] else BUTTON_COLOR
+            music_color = HOVER_COLOR if self.settings["music"] else BUTTON_COLOR
+            language_color = BUTTON_COLOR  # Тут можна додати зміну кольору, якщо потрібно
+
+            pygame.draw.rect(self.screen, sound_color, sound_button, border_radius=10)
+            pygame.draw.rect(self.screen, music_color, music_button, border_radius=10)
+            pygame.draw.rect(self.screen, language_color, language_button, border_radius=10)
+
+            sound_label = self.font.render("Звук: Включено" if self.settings["sound"] else "Звук: Вимкнено", True, TEXT_COLOR)
+            music_label = self.font.render("Музика: Включено" if self.settings["music"] else "Музика: Вимкнено", True, TEXT_COLOR)
+            language_label = self.font.render("Мова: " + (self.languages[self.settings["language"]]["play"] if self.settings["language"] == "uk" else "English"), True, TEXT_COLOR)
+
+            self.screen.blit(sound_label, (sound_button.centerx - sound_label.get_width() // 2, sound_button.centery - sound_label.get_height() // 2))
+            self.screen.blit(music_label, (music_button.centerx - music_label.get_width() // 2, music_button.centery - music_label.get_height() // 2))
+            self.screen.blit(language_label, (language_button.centerx - language_label.get_width() // 2, language_button.centery - language_label.get_height() // 2))
+
+            # Кнопка збереження
+            save_button = pygame.Rect(WIDTH // 2 - 150, HEIGHT - 100, 300, 60)
+            pygame.draw.rect(self.screen, BUTTON_COLOR, save_button, border_radius=10)
+            save_label = self.font.render("Зберегти", True, TEXT_COLOR)
+            self.screen.blit(save_label, (save_button.centerx - save_label.get_width() // 2, save_button.centery - save_label.get_height() // 2))
+
+            pygame.display.flip()
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.exit_game()
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    if sound_button.collidepoint(event.pos):
+                        self.settings["sound"] = not self.settings["sound"]
+                    if music_button.collidepoint(event.pos):
+                        self.settings["music"] = not self.settings["music"]
+                    if language_button.collidepoint(event.pos):
+                        # Зміна мови (цикл між доступними мовами)
+                        languages_list = list(self.languages.keys())
+                        current_index = languages_list.index(self.settings["language"])
+                        self.settings["language"] = languages_list[(current_index + 1) % len(languages_list)]
+                    if save_button.collidepoint(event.pos):
+                        save_settings(self.settings)  # Зберігаємо налаштування
+                        settings_active = False
+                        self.show_menu()
+
+    def change_nickname(self):
+        input_active = True
+        input_text = self.settings["nickname"]
+        input_box = pygame.Rect(WIDTH // 2 - 150, HEIGHT // 2 - 20, 300, 60)
+
+        while input_active:
+            self.screen.fill(BG_COLOR)
+            title_text = self.font.render("Зміна нікнейму", True, TEXT_COLOR)
+            self.screen.blit(title_text, (WIDTH // 2 - title_text.get_width() // 2, 100))
+
+            text_surface = self.font.render(input_text, True, TEXT_COLOR)
+            self.screen.blit(text_surface, (input_box.x + 10, input_box.y + 10))
+
+            pygame.draw.rect(self.screen, BUTTON_COLOR, input_box, border_radius=10)
+
+            back_button = pygame.Rect(WIDTH // 2 - 150, HEIGHT - 100, 300, 60)
+            pygame.draw.rect(self.screen, BUTTON_COLOR, back_button, border_radius=10)
+            back_label = self.font.render("Назад", True, TEXT_COLOR)
+            self.screen.blit(back_label, (back_button.centerx - back_label.get_width() // 2, back_button.centery - back_label.get_height() // 2))
+
+            pygame.display.flip()
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.exit_game()
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_BACKSPACE:
+                        input_text = input_text[:-1]
+                    elif event.key == pygame.K_RETURN:
+                        self.settings["nickname"] = input_text
+                        save_settings(self.settings)
+                        input_active = False
+                        self.show_menu()
+                    else:
+                        input_text += event.unicode
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    if back_button.collidepoint(event.pos):
+                        input_active = False
+                        self.show_menu()
+
+    def play_menu_music(self):
+        menu_music_path = resource_path("assets/music/menu_music.mp3")
+        if os.path.exists(menu_music_path):
+            pygame.mixer.music.load(menu_music_path)
+            pygame.mixer.music.play(-1)
+
+    def play_game_music(self):
+        game_music_path = resource_path("assets/music/Snake_Rattle_Dendy.mp3")
+        if os.path.exists(game_music_path) and self.settings["music"]:
+            pygame.mixer.music.load(game_music_path)
+            pygame.mixer.music.play(-1)
+
+    def play_training_music(self):
+        training_music_path = resource_path("assets/music/training-mode.mp3")
+        if os.path.exists(training_music_path) and self.settings["music"]:
+            pygame.mixer.music.load(training_music_path)
+            pygame.mixer.music.play(-1)
+
+    def run_game(self):
+        self.running = True
+        self.play_game_music()
+        self.start_snake()
+
+        while self.running:
+            self.handle_events()
+            self.update_snake()
+            self.check_collisions()
+            self.draw()
+            self.clock.tick(15 + self.score // 5)
+        self.save_score_to_leaderboard()
+        self.show_game_over()
+
+    def show_game_over(self):
+        game_over_text = self.font.render("ГРА ЗАКІНЧЕНА", True, TEXT_COLOR)
+        self.screen.fill(BG_COLOR)
+        self.screen.blit(game_over_text, (self.width // 2 - game_over_text.get_width() // 2, self.height // 3))
+
+        retry_button = pygame.Rect(self.width // 2 - 150, self.height // 2 - 60, 300, 60)
+        exit_button = pygame.Rect(self.width // 2 - 150, self.height // 2 + 60, 300, 60)
+
+        buttons = [(retry_button, "Повторити"), (exit_button, "Назад в меню")]
+
+        for rect, text in buttons:
+            pygame.draw.rect(self.screen, BUTTON_COLOR, rect, border_radius=10)
+            label = self.font.render(text, True, TEXT_COLOR)
+            self.screen.blit(label, (rect.centerx - label.get_width() // 2, rect.centery - label.get_height() // 2))
+
+        pygame.display.flip()
+
+        waiting_for_input = True
+        while waiting_for_input:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.exit_game()
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    if retry_button.collidepoint(event.pos):
+                        waiting_for_input = False
+                        self.run_game()  # Пробуємо знову
+                    elif exit_button.collidepoint(event.pos):
+                        waiting_for_input = False
+                        self.show_menu()  # Повертаємось до меню
+
+    def run_training_mode(self):
+        self.running = True
+        self.play_training_music()
+        self.start_snake()
+
+        while self.running:
+            self.handle_events(training=True)
+            self.update_snake()
+            self.draw()
+            self.clock.tick(15 + self.score // 5)
+            self.save_score_to_leaderboard(training=True)
+
+    def start_snake(self):
+        self.speed = CELL_SIZE
+        self.head_pos = pygame.math.Vector2(self.width // 2, self.height // 2)
+        self.direction_vector = pygame.math.Vector2(1, 0)
+        self.snake = [self.head_pos.copy() - pygame.math.Vector2(i * CELL_SIZE, 0) for i in range(5)]
+        self.head_pos = self.snake[0].copy()
+        self.score = 0
+        self.foods = self.generate_foods()
+
+    def handle_events(self, training=False):
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.exit_game()
+            elif event.type == pygame.KEYDOWN:
+                if event.key == K_ESCAPE:
+                    self.show_pause_menu()  # Викликаємо меню паузи
+                elif event.key == K_UP and self.direction_vector.y == 0:
+                    self.direction_vector = pygame.math.Vector2(0, -1)
+                elif event.key == K_DOWN and self.direction_vector.y == 0:
+                    self.direction_vector = pygame.math.Vector2(0, 1)
+                elif event.key == K_LEFT and self.direction_vector.x == 0:
+                    self.direction_vector = pygame.math.Vector2(-1, 0)
+                elif event.key == K_RIGHT and self.direction_vector.x == 0:
+                    self.direction_vector = pygame.math.Vector2(1, 0)
+
+    def update_snake(self):
+        self.head_pos += self.direction_vector * self.speed
+        # Обмеження змії на межах екрану
+        self.head_pos.x = max(0, min(self.width - CELL_SIZE, self.head_pos.x))
+        self.head_pos.y = max(0, min(self.height - CELL_SIZE, self.head_pos.y))
+
+        self.snake.insert(0, self.head_pos.copy())
+        ate = False
+        for food in self.foods:
+            if self.head_pos.distance_to(food['pos']) < CELL_SIZE:
+                self.score += food['points']
+                if self.settings["sound"]:
+                    self.sounds["eat"].play()
+                self.foods.remove(food)
+                pos, food_type = self.generate_food()
+                points = 1 if food_type == "normal" else 5
+                self.foods.append({'pos': pos, 'type': food_type, 'points': points})
+                ate = True
+                break
+        if not ate:
+            self.snake.pop()
+
+    def check_collisions(self):
+        if any(self.head_pos.distance_to(segment) < CELL_SIZE for segment in self.snake[1:]):
+            if self.settings["sound"]:
+                self.sounds["collision"].play()
+            self.running = False
+
+    def draw(self):
+        self.screen.fill(BG_COLOR)
+        for segment in self.snake:
+            pygame.draw.ellipse(self.screen, TEXT_COLOR, (segment.x, segment.y, CELL_SIZE, CELL_SIZE))
+        for food in self.foods:
+            color = SPECIAL_FOOD_COLOR if food['type'] == "special" else FOOD_COLOR
+            pygame.draw.ellipse(self.screen, color, (food['pos'].x, food['pos'].y, CELL_SIZE, CELL_SIZE))
+        score_text = self.font.render(f"Рахунок: {self.score}", True, TEXT_COLOR)
+        self.screen.blit(score_text, (10, 10))
+        pygame.display.flip()
+
+    def generate_foods(self):
+        return [{'pos': self.generate_food()[0], 'type': self.generate_food()[1], 'points': 5 if self.generate_food()[1]=='special' else 1} for _ in range(FOOD_COUNT)]
+
+    def generate_food(self):
+        while True:
+            pos = pygame.math.Vector2(random.randint(0, self.width - CELL_SIZE), random.randint(0, self.height - CELL_SIZE))
+            if all(pos.distance_to(segment) > CELL_SIZE for segment in self.snake):
+                food_type = "special" if random.random() < SPECIAL_FOOD_CHANCE else "normal"
+                return pos, food_type
+
+    def exit_game(self):
+        pygame.quit()
+        sys.exit()
+
+    def show_pause_menu(self):
+        blur_surface = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        blur_surface.fill((0, 0, 0, 150))  # Напівпрозорий чорний фон
+        self.screen.blit(blur_surface, (0, 0))
+
+        font = pygame.font.Font(None, 50)
+        continue_button = pygame.Rect(self.width // 2 - 150, self.height // 2 - 100, 300, 60)
+        settings_button = pygame.Rect(self.width // 2 - 150, self.height // 2, 300, 60)
+        exit_button = pygame.Rect(self.width // 2 - 150, self.height // 2 + 100, 300, 60)
+
+        buttons = [(continue_button, "Продовжити"), (settings_button, "Налаштування"), (exit_button, "Назад до меню")]
+
+        for rect, text in buttons:
+            pygame.draw.rect(self.screen, BUTTON_COLOR, rect, border_radius=10)
+            label = font.render(text, True, TEXT_COLOR)
+            self.screen.blit(label, (rect.centerx - label.get_width() // 2, rect.centery - label.get_height() // 2))
+
+        pygame.display.flip()
+
+        waiting_for_input = True
+        while waiting_for_input:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.exit_game()
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    if continue_button.collidepoint(event.pos):
+                        waiting_for_input = False
+                        self.running = True  # Продовжуємо гру
+                    elif settings_button.collidepoint(event.pos):
+                        self.show_settings()  # Показуємо налаштування
+                    elif exit_button.collidepoint(event.pos):
+                        self.show_menu()  # Виходимо в меню
+
+    def show_settings(self):
+        settings_active = True
+        while settings_active:
+            self.screen.fill(BG_COLOR)
+            title = self.font.render("Налаштування", True, TEXT_COLOR)
+            self.screen.blit(title, (self.width // 2 - 150, 100))
+
+            music_state = "Увімкнено" if self.settings["music"] else "Вимкнено"
+            sound_state = "Увімкнено" if self.settings["sound"] else "Вимкнено"
+            language_state = self.settings["language"].upper()
+
+            music_button = pygame.Rect(self.width // 2 - 150, 180, 300, 60)
+            sound_button = pygame.Rect(self.width // 2 - 150, 260, 300, 60)
+            language_button = pygame.Rect(self.width // 2 - 150, 340, 300, 60)
+            back_button = pygame.Rect(self.width // 2 - 150, self.height - 100, 300, 60)
+
+            buttons = [
+                (music_button, f"Музика: {music_state}"),
+                (sound_button, f"Звуки: {sound_state}"),
+                (language_button, f"Мова: {language_state}"),
+                (back_button, "Назад")
+            ]
+
+            for rect, text in buttons:
+                pygame.draw.rect(self.screen, BUTTON_COLOR, rect, border_radius=10)
+                label = self.font.render(text, True, TEXT_COLOR)
+                self.screen.blit(label, (rect.centerx - label.get_width() // 2, rect.centery - label.get_height() // 2))
+
+            pygame.display.flip()
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.exit_game()
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    if music_button.collidepoint(event.pos):
+                        self.settings["music"] = not self.settings["music"]
+                        save_settings(self.settings)
+                    elif sound_button.collidepoint(event.pos):
+                        self.settings["sound"] = not self.settings["sound"]
+                        save_settings(self.settings)
+                    elif language_button.collidepoint(event.pos):
+                        self.change_language()  # Додамо функцію для зміни мови
+                    elif back_button.collidepoint(event.pos):
+                        settings_active = False
+                        self.show_menu()  # Повертаємось в меню
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == K_ESCAPE:
+                        settings_active = False
+                        self.show_menu()  # Повертаємось в меню
+
+    def change_language(self):
+        languages = ['uk', 'en', 'ru', 'be', 'pl']
+        current_index = languages.index(self.settings["language"])
+        new_language = languages[(current_index + 1) % len(languages)]
+        self.settings["language"] = new_language
+        save_settings(self.settings)
+
+if __name__ == "__main__":
+    try:
+        game = SnakeGame()
+    except Exception:
+        log_exception()
+
+        pygame.init()
+        screen = pygame.display.set_mode((800, 600))
+        font = pygame.font.Font(None, 40)
+        screen.fill((20, 0, 0))
+
+        error_texts = [
+            "Error detected",
+            "Please restart the game",
+            "If the issue persists, contact AFER support",
+            "Website – https://afercorporftaon.onepage.me/"
+        ]
+
+        for i, line in enumerate(error_texts):
+            rendered = font.render(line, True, (255, 0, 0))
+            screen.blit(rendered, (400 - rendered.get_width() // 2, 200 + i * 50))
+
+        pygame.display.flip()
+
+        waiting = True
+        while waiting:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
+                    waiting = False
+        pygame.quit()
