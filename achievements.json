@@ -1,0 +1,38 @@
+{
+    "first_game": {
+        "name": "Перша кров",
+        "desc": "Зіграйте першу гру",
+        "unlocked": true,
+        "icon": "first_blood"
+    },
+    "score_100": {
+        "name": "Стояк",
+        "desc": "Наберіть 100 очок",
+        "unlocked": false,
+        "icon": "score_100"
+    },
+    "score_500": {
+        "name": "Напівпрофесіонал",
+        "desc": "Наберіть 500 очок",
+        "unlocked": false,
+        "icon": "score_500"
+    },
+    "score_1000": {
+        "name": "Майстер змійки",
+        "desc": "Наберіть 1000 очок",
+        "unlocked": false,
+        "icon": "snake_master"
+    },
+    "level_completer": {
+        "name": "Тактика",
+        "desc": "Завершіть рівень",
+        "unlocked": true,
+        "icon": "level_complete"
+    },
+    "food_master": {
+        "name": "Гурман",
+        "desc": "З'їжте 50 їжі",
+        "unlocked": false,
+        "icon": "food_master"
+    }
+}

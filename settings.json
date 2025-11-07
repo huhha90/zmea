@@ -1,0 +1,37 @@
+{
+    "profile": {
+        "nickname": "huhha",
+        "language": "uk"
+    },
+    "graphics": {
+        "resolution": "1920x1080",
+        "fullscreen": true,
+        "fps": 60
+    },
+    "audio": {
+        "music_volume": 0.59,
+        "sound_volume": 0.4266666666666667,
+        "sound_enabled": true
+    },
+    "controls": {
+        "up": "K_UP",
+        "down": "K_DOWN",
+        "left": "K_LEFT",
+        "right": "K_RIGHT",
+        "pause": "K_ESCAPE"
+    },
+    "gameplay": {
+        "default_speed": 15
+    },
+    "appearance": {
+        "skin_key": "rainbow_fade",
+        "skin_color": [
+            0,
+            200,
+            0
+        ]
+    },
+    "misc": {
+        "support_site": "afercorporftaon.onepage.me"
+    }
+}
