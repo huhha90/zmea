@@ -1,0 +1,55 @@
+def show_settings_menu(self):
+        """Головне меню налаштувань з категоріями."""
+        menu_active = True
+        self.active_settings_submenu = None # Скидаємо активне підменю
+
+        button_keys = ["settings_audio", "settings_graphics", "settings_skins", "settings_language", "back"]
+        actions = {
+            "settings_audio": self.show_audio_settings,
+            "settings_graphics": self.show_graphics_settings,
+            "settings_skins": self.show_skin_settings,
+            "settings_language": self.show_language_settings,
+            "back": self.show_menu # Кнопка "Назад" повертає в головне ігрове меню
+        }
+        button_rect_data = self._create_button_rects(button_keys)
+
+        while menu_active:
+             # Якщо активне підменю, викликаємо його і виходимо з цього циклу
+             if self.active_settings_submenu:
+                 submenu_func = self.active_settings_submenu
+                 self.active_settings_submenu = None # Скидаємо перед викликом
+                 submenu_func() # Викликаємо функцію підменю
+                 # Якщо підменю повернуло нас сюди (через кнопку "Назад" в ньому),
+                 # то просто продовжуємо цикл головного меню налаштувань.
+                 # Якщо підменю вийшло в головне меню гри, то цей цикл завершиться.
+                 if not self.running: menu_active = False # Вихід з гри з підменю
+                 continue # Продовжуємо цикл show_settings_menu
+
+             self.screen.fill(BG_COLOR)
+             title = self.font.render(self.get_text("settings"), True, TEXT_COLOR)
+             title_rect = title.get_rect(center=(self.width // 2, button_rect_data[0][0].top - 60))
+             self.screen.blit(title, title_rect)
+
+             mouse_pos = pygame.mouse.get_pos()
+             self._draw_buttons(button_rect_data, mouse_pos)
+             pygame.display.flip()
+
+             for event in pygame.event.get():
+                 if event.type == pygame.QUIT: self.exit_game()
+                 elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                     save_json_file(SETTINGS_FILE, self.settings); menu_active = False; self.show_menu(); return
+                 elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                     for rect, key in button_rect_data:
+                         if rect.collidepoint(mouse_pos):
+                             self.play_sound("click")
+                             if key == "back":
+                                 save_json_file(SETTINGS_FILE, self.settings) # Збереження при виході з налаштувань
+                                 menu_active = False
+                                 actions[key]() # Виклик show_menu()
+                                 return # Важливо вийти після виклику show_menu
+                             else:
+                                 self.active_settings_submenu = actions[key] # Встановлюємо активне підменю
+                             break # Виходимо з циклу кнопок
+                     if self.active_settings_submenu: break # Виходимо з циклу подій, щоб перейти до підменю
+
+             self.clock.tick(self.settings["graphics"].get("fps", 60))

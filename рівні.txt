@@ -1,0 +1,22 @@
+[
+  { "id": 0, "name": "Рівень 1", "speed": 11, "food_count": 5, "special_food_chance": 0.12, "obstacles": 4, "has_timer": false, "target_score": 5, "music": "assets/levls/level1.mp3" },
+  { "id": 1, "name": "Рівень 2", "speed": 12, "food_count": 5, "special_food_chance": 0.14, "obstacles": 0, "has_timer": false, "target_score": 56, "music": "assets/levls/level2.mp3" },
+  { "id": 2, "name": "Рівень 3", "speed": 13, "food_count": 5, "special_food_chance": 0.16, "obstacles": 2, "has_timer": true,  "target_score": 77, "music": "assets/levls/level3.mp3" },
+  { "id": 3, "name": "Рівень 4", "speed": 14, "food_count": 5, "special_food_chance": 0.18, "obstacles": 5, "has_timer": false, "target_score": 29, "music": "assets/levls/level4.mp3" },
+  { "id": 4, "name": "Рівень 5", "speed": 15, "food_count": 4, "special_food_chance": 0.2,  "obstacles": 3, "has_timer": true,  "target_score": 93, "music": "assets/levls/level5.mp3" },
+  { "id": 5, "name": "Рівень 6", "speed": 16, "food_count": 4, "special_food_chance": 0.22, "obstacles": 2, "has_timer": false, "target_score": 54, "music": "assets/levls/level6.mp3" },
+  { "id": 6, "name": "Рівень 7", "speed": 17, "food_count": 4, "special_food_chance": 0.24, "obstacles": 0, "has_timer": false, "target_score": 84, "music": "assets/levls/level7.mp3" },
+  { "id": 7, "name": "Рівень 8", "speed": 18, "food_count": 4, "special_food_chance": 0.26, "obstacles": 1, "has_timer": false, "target_score": 41, "music": "assets/levls/level8.mp3" },
+  { "id": 8, "name": "Рівень 9", "speed": 19, "food_count": 4, "special_food_chance": 0.28, "obstacles": 3, "has_timer": true,  "target_score": 97, "music": "assets/levls/level9.mp3" },
+  { "id": 9, "name": "Рівень 10", "speed": 20, "food_count": 3, "special_food_chance": 0.3,  "obstacles": 4, "has_timer": false, "target_score": 55, "music": "assets/levls/level10.mp3" },
+  { "id": 10, "name": "Рівень 11", "speed": 21, "food_count": 3, "special_food_chance": 0.32, "obstacles": 1, "has_timer": false, "target_score": 64, "music": "assets/levls/level1.mp3" },
+  { "id": 11, "name": "Рівень 12", "speed": 22, "food_count": 3, "special_food_chance": 0.34, "obstacles": 3, "has_timer": true,  "target_score": 36, "music": "assets/levls/level2.mp3" },
+  { "id": 12, "name": "Рівень 13", "speed": 23, "food_count": 3, "special_food_chance": 0.36, "obstacles": 5, "has_timer": false, "target_score": 75, "music": "assets/levls/level3.mp3" },
+  { "id": 13, "name": "Рівень 14", "speed": 24, "food_count": 3, "special_food_chance": 0.38, "obstacles": 2, "has_timer": false, "target_score": 31, "music": "assets/levls/level4.mp3" },
+  { "id": 14, "name": "Рівень 15", "speed": 25, "food_count": 2, "special_food_chance": 0.4,  "obstacles": 4, "has_timer": false, "target_score": 68, "music": "assets/levls/level5.mp3" },
+  { "id": 15, "name": "Рівень 16", "speed": 26, "food_count": 2, "special_food_chance": 0.42, "obstacles": 0, "has_timer": true,  "target_score": 20, "music": "assets/levls/level6.mp3" },
+  { "id": 16, "name": "Рівень 17", "speed": 27, "food_count": 2, "special_food_chance": 0.44, "obstacles": 2, "has_timer": false, "target_score": 90, "music": "assets/levls/level7.mp3" },
+  { "id": 17, "name": "Рівень 18", "speed": 28, "food_count": 2, "special_food_chance": 0.46, "obstacles": 1, "has_timer": false, "target_score": 48, "music": "assets/levls/level8.mp3" },
+  { "id": 18, "name": "Рівень 19", "speed": 29, "food_count": 2, "special_food_chance": 0.48, "obstacles": 5, "has_timer": false, "target_score": 15, "music": "assets/levls/level9.mp3" },
+  { "id": 19, "name": "Рівень 20", "speed": 30, "food_count": 1, "special_food_chance": 0.5,  "obstacles": 2, "has_timer": true,  "target_score": 100, "music": "assets/levls/level10.mp3" }
+]

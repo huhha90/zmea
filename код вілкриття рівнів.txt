@@ -1,0 +1,25 @@
+def run_game_with_level(self, level_index):
+        self.running = True
+        level_data = self.levels[level_index]
+        self.play_level_music(level_data.get("music", "default.mp3"))
+        self.current_level = level_index
+        self.start_snake_with_level(level_data)
+
+        while self.running:
+              self.handle_events()
+              self.update_snake()
+              self.check_collisions()
+              self.draw()
+              self.clock.tick(self.fps)
+
+# Відкриваємо наступний рівень, якщо не відкритий
+        next_level = level_index + 1
+        if self.score > 0 and next_level < len(self.levels):
+         if next_level not in self.level_progress["unlocked_levels"]:
+          self.level_progress["unlocked_levels"].append(next_level)
+          self.save_level_progress(self.level_progress)
+
+    
+        self.save_score_to_leaderboard()
+        self.running = False
+        self.show_game_over()

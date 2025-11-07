@@ -1,0 +1,60 @@
+def level_select_menu(self):
+        levels = self.load_levels()
+        progress = self.load_level_progress()
+        lang = self.settings["language"]
+        selected = None
+        running = True
+
+    # Кнопка "Назад"
+        back_button = pygame.Rect(self.width // 2 - 75, self.height - 100, 150, 50)
+
+        while running:
+         self.screen.fill(BG_COLOR)
+
+        # Заголовок
+        title_text = self.font.render(self.languages[lang]["levels"], True, TEXT_COLOR)
+        self.screen.blit(title_text, (self.width // 2 - title_text.get_width() // 2, 50))
+
+        # Відображення рівнів
+        level_rects = []
+        for i, level in enumerate(levels):
+            y = 150 + i * 70
+            rect = pygame.Rect(self.width // 2 - 200, y, 400, 50)
+            level_rects.append(rect)
+
+            passed = progress.get(level["id"], {}).get("passed", False)
+            label_text = f"{level['name']} - {'✅' if passed else '❌'}"
+            label = self.font.render(label_text, True, TEXT_COLOR)
+
+            pygame.draw.rect(self.screen, BUTTON_COLOR, rect, border_radius=10)
+            self.screen.blit(label, (rect.centerx - label.get_width() // 2, rect.centery - label.get_height() // 2))
+
+        # Кнопка "Назад"
+        pygame.draw.rect(self.screen, BUTTON_COLOR, back_button, border_radius=10)
+        back_label = self.font.render(self.languages[lang]["back"], True, TEXT_COLOR)
+        self.screen.blit(back_label, (
+            back_button.centerx - back_label.get_width() // 2,
+            back_button.centery - back_label.get_height() // 2
+        ))
+
+        pygame.display.flip()
+
+        # Обробка подій
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.exit_game()
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if back_button.collidepoint(event.pos):
+                    if self.settings["sound"]:
+                        self.sounds["click"].play()
+                    running = False
+                    break
+
+                for i, rect in enumerate(level_rects):
+                    if rect.collidepoint(event.pos):
+                        if self.settings["sound"]:
+                            self.sounds["click"].play()
+                        selected_level = levels[i]
+                        self.start_level(selected_level)
+                        running = False
+                        break
